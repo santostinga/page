@@ -1,0 +1,21 @@
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Editor / IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Env / local
+.env
+.env.*
+!.env.example
+
+# PHP
+/vendor/
+
+# Logs
+*.log
