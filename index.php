@@ -14,9 +14,10 @@ require __DIR__ . '/includes/head.php';
 <!-- Navigation -->
 <header class="fixed top-0 left-0 right-0 z-50 border-b border-white/5 bg-slate-950/75 nav-blur">
   <div class="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
-    <a href="#" class="flex items-center gap-2">
-      <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 text-lg font-bold text-white shadow-glow-sm">S</span>
-      <span class="text-lg font-semibold tracking-tight text-white">Sizo <span class="text-orange-400">Technology</span></span>
+    <a href="#" class="flex items-center" aria-label="Sizo TECH — início">
+      <span class="inline-flex items-center rounded-xl bg-white px-3 py-1.5 shadow-sm ring-1 ring-white/20">
+        <img src="assets/img/logo.png" alt="Sizo TECH — Smart IT Solutions" class="h-7 w-auto max-h-8 object-contain object-left sm:h-8 sm:max-h-9" width="200" height="48" />
+      </span>
     </a>
     <nav class="hidden items-center gap-7 lg:gap-8 md:flex" aria-label="Principal">
       <a href="#sobre" class="text-sm font-medium text-slate-300 transition hover:text-white">Sobre</a>
@@ -554,9 +555,8 @@ require __DIR__ . '/includes/head.php';
   <div class="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
       <div class="grid grid-cols-2 gap-10 sm:grid-cols-4">
         <div class="col-span-2 max-w-md sm:col-span-2">
-        <a href="#" class="flex items-center gap-2 text-white">
-          <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 font-bold">S</span>
-          <span class="text-lg font-semibold">Sizo Technology</span>
+        <a href="#" class="inline-flex items-center rounded-xl bg-white p-2 ring-1 ring-white/10" aria-label="Sizo TECH">
+          <img src="assets/img/logo.png" alt="Sizo TECH — Smart IT Solutions" class="h-8 w-auto max-w-[200px] object-contain sm:h-9" width="200" height="48" />
         </a>
         <p class="mt-4 text-sm leading-relaxed">
           Smart IT solutions para empresas que exigem controlo, clareza e crescimento.
