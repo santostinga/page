@@ -9,6 +9,10 @@ return [
         /** Formato internacional Moçambique */
         'telefone_display' => '+258 84 025 5253',
         'telefone_href' => 'tel:+258840255253',
+        /** Ligações «Contacto» e número clicável abrem o WhatsApp Web / app */
+        'whatsapp_url' => 'https://wa.me/258840255253?' . http_build_query([
+            'text' => 'Olá! Gostaria de mais informações sobre o Sizo Software.',
+        ]),
     ],
 
     'nota_licenca' => 'A licença de uso é contratada por período anual. O valor total é dividido em 12 prestações mensais iguais — os valores indicados são o montante de cada parcela mensal (MT/mês).',

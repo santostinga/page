@@ -7,6 +7,10 @@ $sizoContacto = $sizoCfg['contacto'];
 $sizoNotaLicenca = $sizoCfg['nota_licenca'];
 $sizoComparacao = $sizoCfg['comparacao'];
 $sizoMailtoBase = 'mailto:' . rawurlencode($sizoContacto['email']);
+$sizoWhatsAppUrl = $sizoContacto['whatsapp_url'];
+$sizoFaq = require __DIR__ . '/config/faq.php';
+$sizoFuncionalidades = require __DIR__ . '/config/funcionalidades.php';
+require_once __DIR__ . '/includes/feature-art.php';
 
 require __DIR__ . '/includes/head.php';
 ?>
@@ -25,12 +29,10 @@ require __DIR__ . '/includes/head.php';
       <a href="#planos" class="text-sm font-medium text-slate-300 transition hover:text-white">Planos</a>
       <a href="#comparacao-planos" class="text-sm font-medium text-slate-300 transition hover:text-white">Comparar</a>
       <a href="#screenshots" class="text-sm font-medium text-slate-300 transition hover:text-white">Plataforma</a>
-      <a href="#cta" class="text-sm font-medium text-slate-300 transition hover:text-white">Contacto</a>
+      <a href="#faq" class="text-sm font-medium text-slate-300 transition hover:text-white">FAQ</a>
+      <a href="<?= htmlspecialchars($sizoWhatsAppUrl, ENT_QUOTES, 'UTF-8') ?>" class="text-sm font-medium text-slate-300 transition hover:text-white" target="_blank" rel="noopener noreferrer">Contacto</a>
     </nav>
     <div class="flex items-center gap-3">
-      <a href="https://app.sizo.technology" class="hidden rounded-full bg-white/10 px-4 py-2 text-sm font-medium text-white ring-1 ring-white/15 transition hover:bg-white/15 sm:inline-flex" target="_blank" rel="noopener noreferrer">
-        Entrar
-      </a>
       <a href="#cta" class="rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-blue-600/30 transition hover:bg-blue-500">
         Demonstração
       </a>
@@ -46,7 +48,8 @@ require __DIR__ . '/includes/head.php';
       <a href="#planos" class="text-sm font-medium text-slate-300">Planos</a>
       <a href="#screenshots" class="text-sm font-medium text-slate-300">Plataforma</a>
       <a href="#comparacao-planos" class="text-sm font-medium text-slate-300">Comparar</a>
-      <a href="#cta" class="text-sm font-medium text-slate-300">Contacto</a>
+      <a href="#faq" class="text-sm font-medium text-slate-300">FAQ</a>
+      <a href="<?= htmlspecialchars($sizoWhatsAppUrl, ENT_QUOTES, 'UTF-8') ?>" class="text-sm font-medium text-slate-300" target="_blank" rel="noopener noreferrer">Contacto</a>
     </div>
   </div>
 </header>
@@ -264,49 +267,81 @@ require __DIR__ . '/includes/head.php';
   </section>
 
   <!-- Funcionalidades -->
-  <section id="funcionalidades" class="relative overflow-hidden border-t border-slate-100 bg-slate-50 py-24 sm:py-32">
+  <section id="funcionalidades" class="relative overflow-hidden border-t border-slate-100 bg-gradient-to-b from-slate-50 via-white to-slate-50 py-24 sm:py-32">
     <div class="pointer-events-none absolute -right-40 top-20 h-96 w-96 rounded-full bg-blue-400/10 blur-3xl"></div>
+    <div class="pointer-events-none absolute -left-20 bottom-40 h-72 w-72 rounded-full bg-indigo-400/10 blur-3xl"></div>
     <div class="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-      <div class="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between" data-aos="fade-up">
-        <div class="max-w-2xl">
-          <p class="text-sm font-semibold uppercase tracking-[0.2em] text-blue-600">O que fazemos</p>
-          <p class="section-title-bold mt-3 text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl md:text-[2.75rem] md:leading-tight">
-            Explore os nossos serviços<br class="hidden sm:inline"> de <span class="text-blue-600">qualidade premium</span>
-          </p>
-          <p class="mt-4 text-lg text-slate-600">
-            Stock, facturação, relatórios e equipas — integrados num dashboard moderno e intuitivo.
-          </p>
-        </div>
+      <div class="mx-auto max-w-3xl text-center" data-aos="fade-up">
+        <p class="text-sm font-semibold uppercase tracking-[0.2em] text-blue-600">SizoTech ERP</p>
+        <p class="section-title-bold mt-3 text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl md:text-[2.65rem] md:leading-tight">
+          <?= htmlspecialchars($sizoFuncionalidades['lead']['titulo'], ENT_QUOTES, 'UTF-8') ?>
+        </p>
+        <p class="mt-4 text-lg text-slate-600">
+          <?= htmlspecialchars($sizoFuncionalidades['lead']['texto'], ENT_QUOTES, 'UTF-8') ?>
+        </p>
       </div>
-      <div class="mt-16 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <?php
-        $features = [
-          ['t' => 'Gestão de Stock', 'd' => 'Inventário, movimentações e alertas para nunca perder o controlo.', 'c' => 'from-emerald-500 to-teal-600'],
-          ['t' => 'Facturação', 'd' => 'Fluxos comerciais e documentação alinhados ao dia-a-dia da empresa.', 'c' => 'from-blue-600 to-indigo-600'],
-          ['t' => 'Relatórios', 'd' => 'Análises por período, cliente, produto e muito mais.', 'c' => 'from-violet-500 to-purple-600'],
-          ['t' => 'Dashboard moderno', 'd' => 'Visão executiva com métricas e gráficos em tempo real.', 'c' => 'from-sky-500 to-blue-600'],
-          ['t' => 'Gestão Multiempresa', 'd' => 'Várias empresas e contextos num só login seguro.', 'c' => 'from-amber-500 to-orange-600'],
-          ['t' => 'Permissões', 'd' => 'Perfis e permissões granulares para utilizadores e equipas.', 'c' => 'from-rose-500 to-red-600'],
-        ];
-        $fd = 0;
-        foreach ($features as $f):
-          $fd += 60;
-        ?>
-        <article class="feature-card group relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-8 shadow-sm" data-aos="fade-up" data-aos-delay="<?= min($fd, 300) ?>">
-          <div class="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-gradient-to-br <?= $f['c'] ?> opacity-10 blur-2xl transition-opacity group-hover:opacity-25"></div>
-          <div class="relative">
-            <div class="inline-flex rounded-xl bg-slate-100 p-3 ring-1 ring-slate-200/80">
-              <svg class="h-6 w-6 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+
+      <?php
+      $funcPreviewLimit = 3;
+      ?>
+      <div class="mt-16 grid grid-cols-1 gap-5 md:grid-cols-3 md:gap-6 lg:gap-8">
+        <?php foreach ($sizoFuncionalidades['pilares'] as $pi => $pillar):
+          $pillarItems = $pillar['itens'];
+          $pillarPreview = array_slice($pillarItems, 0, $funcPreviewLimit);
+          $pillarExtra = array_slice($pillarItems, $funcPreviewLimit);
+          $pillarHasMore = count($pillarExtra) > 0;
+          ?>
+        <article class="feature-pillar group flex h-full min-h-[14rem] flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-md shadow-slate-900/[0.04] ring-1 ring-slate-900/[0.03] transition hover:shadow-lg hover:ring-blue-500/10 sm:min-h-[15rem]" data-aos="fade-up" data-aos-delay="<?= min($pi * 40, 200) ?>">
+          <div class="relative flex h-28 shrink-0 items-center justify-center bg-gradient-to-br <?= htmlspecialchars($pillar['gradient'], ENT_QUOTES, 'UTF-8') ?> px-3">
+            <div class="absolute inset-0 bg-[radial-gradient(circle_at_50%_25%,rgba(255,255,255,0.22),transparent_60%)]"></div>
+            <div class="relative flex h-full w-full max-w-[152px] items-center justify-center drop-shadow-[0_8px_28px_rgba(0,0,0,0.16)] [&_svg]:max-h-[80px] [&_svg]:w-auto">
+              <?= sizo_feature_art($pillar['art']) ?>
             </div>
-            <h3 class="mt-6 text-xl font-bold text-slate-900"><?= htmlspecialchars($f['t'], ENT_QUOTES, 'UTF-8') ?></h3>
-            <p class="mt-2 text-slate-600 leading-relaxed"><?= htmlspecialchars($f['d'], ENT_QUOTES, 'UTF-8') ?></p>
-            <span class="mt-6 inline-flex items-center gap-1 text-sm font-semibold text-blue-600 opacity-0 transition group-hover:opacity-100">
-              Explorar
-              <svg class="h-4 w-4 translate-x-0 transition group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
-            </span>
+          </div>
+          <div class="feature-pillar-body flex flex-1 flex-col px-4 pb-3 pt-3 sm:px-5 sm:pb-4 sm:pt-4">
+            <div class="flex flex-wrap items-start gap-2 sm:gap-3">
+              <span class="rounded-full bg-blue-50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-blue-700 sm:px-3 sm:text-xs"><?= sprintf('%02d', $pi + 1) ?></span>
+              <h3 class="text-sm font-bold leading-snug tracking-tight text-slate-900 sm:text-base"><?= htmlspecialchars($pillar['titulo'], ENT_QUOTES, 'UTF-8') ?></h3>
+            </div>
+            <?php if (!empty($pillar['subtitulo'])): ?>
+            <p class="mt-1.5 text-[11px] font-medium leading-snug text-blue-600 sm:text-xs"><?= htmlspecialchars($pillar['subtitulo'], ENT_QUOTES, 'UTF-8') ?></p>
+            <?php endif; ?>
+            <ul class="feature-pillar-list mt-2 space-y-1.5 text-[11px] leading-snug text-slate-600 sm:mt-3 sm:space-y-2 sm:text-xs sm:leading-relaxed">
+              <?php foreach ($pillarPreview as $bullet): ?>
+              <li class="flex gap-2 sm:gap-2.5">
+                <span class="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 sm:h-5 sm:w-5">
+                  <svg class="h-2.5 w-2.5 sm:h-3 sm:w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+                </span>
+                <span><?= htmlspecialchars($bullet, ENT_QUOTES, 'UTF-8') ?></span>
+              </li>
+              <?php endforeach; ?>
+            </ul>
+            <?php if ($pillarHasMore): ?>
+            <ul class="feature-pillar-extra mt-2 hidden space-y-2 border-t border-dashed border-slate-200 pt-2 text-[11px] leading-snug text-slate-600 sm:text-xs sm:leading-relaxed" id="feature-extra-<?= (int) $pi ?>">
+              <?php foreach ($pillarExtra as $bullet): ?>
+              <li class="flex gap-2 sm:gap-2.5">
+                <span class="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 sm:h-5 sm:w-5">
+                  <svg class="h-2.5 w-2.5 sm:h-3 sm:w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+                </span>
+                <span><?= htmlspecialchars($bullet, ENT_QUOTES, 'UTF-8') ?></span>
+              </li>
+              <?php endforeach; ?>
+            </ul>
+            <button type="button" class="feature-pillar-toggle mt-auto inline-flex w-full items-center justify-center gap-2 rounded-lg border border-blue-200/90 bg-blue-50/90 px-3 py-2 text-xs font-semibold text-blue-700 transition hover:border-blue-300 hover:bg-blue-100 sm:text-sm" data-expanded="false" aria-expanded="false" aria-controls="feature-extra-<?= (int) $pi ?>">
+              <span class="feature-pillar-toggle-label">Mostrar tudo</span>
+              <svg class="feature-pillar-toggle-icon h-3.5 w-3.5 shrink-0 transition-transform duration-200 sm:h-4 sm:w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </button>
+            <?php else: ?>
+            <div class="mt-auto flex min-h-[1rem] flex-1"></div>
+            <?php endif; ?>
           </div>
         </article>
         <?php endforeach; ?>
+      </div>
+
+      <div class="mx-auto mt-14 max-w-4xl rounded-2xl border border-slate-200 bg-slate-50/80 px-6 py-5 text-center text-sm leading-relaxed text-slate-600 shadow-inner sm:px-8" data-aos="fade-up">
+        <p class="font-medium text-slate-700">Nota sobre disponibilidade</p>
+        <p class="mt-2"><?= htmlspecialchars($sizoFuncionalidades['nota_transversal'], ENT_QUOTES, 'UTF-8') ?></p>
       </div>
     </div>
   </section>
@@ -514,6 +549,41 @@ require __DIR__ . '/includes/head.php';
     </div>
   </section>
 
+  <!-- FAQ -->
+  <section id="faq" class="scroll-mt-28 border-t border-slate-100 bg-slate-50 py-24 sm:py-32">
+    <div class="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+      <div class="text-center" data-aos="fade-up">
+        <p class="text-sm font-semibold uppercase tracking-[0.2em] text-blue-600">Ajuda</p>
+        <p class="section-title-bold mt-3 text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl md:text-[2.75rem] md:leading-tight">
+          Perguntas <span class="text-blue-600">frequentes</span>
+        </p>
+        <p class="mt-4 text-lg text-slate-600">
+          Respostas rápidas sobre o Sizo Software, planos e licenciamento.
+        </p>
+      </div>
+      <div class="mt-12 grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-5 md:items-start">
+        <?php foreach ($sizoFaq as $fi => $item): ?>
+        <details class="faq-item h-full rounded-2xl border border-slate-200/90 bg-white shadow-sm transition hover:border-slate-300 hover:shadow-md" data-aos="fade-up" data-aos-delay="<?= min($fi * 35, 210) ?>">
+          <summary class="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 text-left sm:px-6 sm:py-5">
+            <span class="pr-2 text-base font-semibold text-slate-900"><?= htmlspecialchars($item['pergunta'], ENT_QUOTES, 'UTF-8') ?></span>
+            <span class="faq-chevron flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-500 ring-1 ring-slate-200/80">
+              <svg class="h-5 w-5 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </span>
+          </summary>
+          <div class="border-t border-slate-100 px-5 pb-5 pt-0 text-slate-600 sm:px-6">
+            <p class="pt-4 text-sm leading-relaxed sm:text-base"><?= htmlspecialchars($item['resposta'], ENT_QUOTES, 'UTF-8') ?></p>
+          </div>
+        </details>
+        <?php endforeach; ?>
+      </div>
+      <p class="mt-10 text-center text-sm text-slate-500" data-aos="fade-up">
+        Não encontrou o que procura?
+        <a href="<?= htmlspecialchars($sizoMailtoBase . '?subject=' . rawurlencode('Dúvida — FAQ Sizo Software'), ENT_QUOTES, 'UTF-8') ?>" class="font-semibold text-blue-600 underline decoration-blue-600/30 underline-offset-2 hover:text-blue-800">Envie-nos uma mensagem</a>
+        ou <a href="#cta" class="font-semibold text-blue-600 underline decoration-blue-600/30 underline-offset-2 hover:text-blue-800">fale connosco</a>.
+      </p>
+    </div>
+  </section>
+
   <!-- CTA -->
   <section id="cta" class="relative py-24 sm:py-32">
     <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -530,18 +600,15 @@ require __DIR__ . '/includes/head.php';
             <a href="<?= htmlspecialchars($sizoMailtoBase . '?subject=' . rawurlencode('Demonstração — Sizo Software'), ENT_QUOTES, 'UTF-8') ?>" class="inline-flex items-center justify-center rounded-full bg-white px-8 py-4 text-base font-semibold text-blue-700 shadow-xl transition hover:bg-blue-50">
               Solicitar demonstração
             </a>
-            <a href="https://app.sizo.technology" class="inline-flex items-center justify-center rounded-full border-2 border-white/40 bg-white/10 px-8 py-4 text-base font-semibold text-white backdrop-blur transition hover:bg-white/20" target="_blank" rel="noopener noreferrer">
-              Entrar na plataforma
-            </a>
           </div>
           <div class="mt-10 flex flex-wrap items-center justify-center gap-x-10 gap-y-4 border-t border-white/15 pt-10 text-sm">
             <a href="<?= htmlspecialchars($sizoMailtoBase, ENT_QUOTES, 'UTF-8') ?>" class="inline-flex items-center gap-2 text-blue-100 transition hover:text-white">
               <svg class="h-5 w-5 shrink-0 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
               <?= htmlspecialchars($sizoContacto['email'], ENT_QUOTES, 'UTF-8') ?>
             </a>
-            <a href="<?= htmlspecialchars($sizoContacto['telefone_href'], ENT_QUOTES, 'UTF-8') ?>" class="inline-flex items-center gap-2 text-blue-100 transition hover:text-white">
-              <svg class="h-5 w-5 shrink-0 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
-              <?= htmlspecialchars($sizoContacto['telefone_display'], ENT_QUOTES, 'UTF-8') ?>
+            <a href="<?= htmlspecialchars($sizoWhatsAppUrl, ENT_QUOTES, 'UTF-8') ?>" class="inline-flex items-center gap-2 text-blue-100 transition hover:text-white" target="_blank" rel="noopener noreferrer">
+              <svg class="h-5 w-5 shrink-0 text-emerald-300" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.435 9.884-9.883 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+              <?= htmlspecialchars($sizoContacto['telefone_display'], ENT_QUOTES, 'UTF-8') ?> · WhatsApp
             </a>
           </div>
         </div>
@@ -566,9 +633,9 @@ require __DIR__ . '/includes/head.php';
             <svg class="h-4 w-4 shrink-0 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
             <?= htmlspecialchars($sizoContacto['email'], ENT_QUOTES, 'UTF-8') ?>
           </a>
-          <a href="<?= htmlspecialchars($sizoContacto['telefone_href'], ENT_QUOTES, 'UTF-8') ?>" class="flex items-center gap-2 text-slate-300 transition hover:text-white">
-            <svg class="h-4 w-4 shrink-0 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
-            <?= htmlspecialchars($sizoContacto['telefone_display'], ENT_QUOTES, 'UTF-8') ?>
+          <a href="<?= htmlspecialchars($sizoWhatsAppUrl, ENT_QUOTES, 'UTF-8') ?>" class="flex items-center gap-2 text-slate-300 transition hover:text-white" target="_blank" rel="noopener noreferrer">
+            <svg class="h-4 w-4 shrink-0 text-emerald-400" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.435 9.884-9.883 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+            <?= htmlspecialchars($sizoContacto['telefone_display'], ENT_QUOTES, 'UTF-8') ?> · WhatsApp
           </a>
         </div>
         </div>
@@ -579,6 +646,7 @@ require __DIR__ . '/includes/head.php';
             <li><a href="#planos" class="transition hover:text-white">Planos</a></li>
             <li><a href="#comparacao-planos" class="transition hover:text-white">Comparar planos</a></li>
             <li><a href="#screenshots" class="transition hover:text-white">Plataforma</a></li>
+            <li><a href="#faq" class="transition hover:text-white">FAQ</a></li>
             <li><a href="#cta" class="transition hover:text-white">Demonstração</a></li>
           </ul>
         </div>
@@ -587,7 +655,7 @@ require __DIR__ . '/includes/head.php';
           <ul class="mt-4 space-y-3 text-sm">
             <li><a href="#sobre" class="transition hover:text-white">Sobre</a></li>
             <li><a href="#processo" class="transition hover:text-white">Processo</a></li>
-            <li><a href="#cta" class="transition hover:text-white">Contacto</a></li>
+            <li><a href="<?= htmlspecialchars($sizoWhatsAppUrl, ENT_QUOTES, 'UTF-8') ?>" class="transition hover:text-white" target="_blank" rel="noopener noreferrer">Contacto</a></li>
           </ul>
         </div>
         <div>

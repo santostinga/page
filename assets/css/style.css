@@ -136,12 +136,42 @@
   position: relative;
 }
 
+/* FAQ — details/summary */
+details.faq-item summary {
+  list-style: none;
+}
+
+details.faq-item summary::-webkit-details-marker {
+  display: none;
+}
+
+details.faq-item[open] {
+  border-color: rgba(191, 219, 254, 0.95);
+  box-shadow:
+    0 10px 40px -15px rgba(37, 99, 235, 0.15),
+    0 0 0 1px rgba(59, 130, 246, 0.12);
+}
+
+details.faq-item[open] .faq-chevron {
+  background-color: rgb(239 246 255);
+  color: rgb(37 99 235);
+  border-color: rgb(191 219 254);
+}
+
+details.faq-item[open] .faq-chevron svg {
+  transform: rotate(180deg);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .mockup-frame,
   .screenshot-card,
   .feature-card,
   .pricing-card,
-  .process-card {
+  .process-card,
+  .feature-pillar {
+    transition: none !important;
+  }
+  details.faq-item .faq-chevron svg {
     transition: none !important;
   }
   [data-aos] {

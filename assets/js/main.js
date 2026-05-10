@@ -42,4 +42,20 @@
       }
     });
   });
+  document.querySelectorAll('.feature-pillar-toggle').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var body = btn.closest('.feature-pillar-body');
+      if (!body) return;
+      var extra = body.querySelector('.feature-pillar-extra');
+      var label = btn.querySelector('.feature-pillar-toggle-label');
+      var icon = btn.querySelector('.feature-pillar-toggle-icon');
+      if (!extra || !label) return;
+      var open = extra.classList.toggle('hidden') === false;
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      label.textContent = open ? 'Mostrar menos' : 'Mostrar tudo';
+      if (icon) {
+        icon.style.transform = open ? 'rotate(180deg)' : '';
+      }
+    });
+  });
 })();
