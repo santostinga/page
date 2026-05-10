@@ -624,6 +624,9 @@ require __DIR__ . '/includes/head.php';
 </main>
 
 <!-- Footer -->
+<?php
+$sizoBuild = is_readable(__DIR__ . '/index.php') ? substr(md5_file(__DIR__ . '/index.php'), 0, 12) : '—';
+?>
 <footer class="border-t border-slate-200 bg-slate-950 text-slate-400">
   <div class="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
       <div class="grid grid-cols-2 gap-10 sm:grid-cols-4">
@@ -676,6 +679,7 @@ require __DIR__ . '/includes/head.php';
       <p>© <span id="footer-year"></span> Sizo Technology · Sizotech Limitada</p>
       <p class="text-slate-500">Tecnologia inteligente para empresas modernas.</p>
       </div>
+      <p class="mt-6 text-center font-mono text-[10px] tracking-wider text-slate-600" title="Parcial do MD5 do index.php neste servidor — após deploy deve coincidir com certutil no PC">Build <?= htmlspecialchars($sizoBuild, ENT_QUOTES, 'UTF-8') ?></p>
     </div>
 </footer>
 
