@@ -1,27 +1,10 @@
 <?php
 $pageTitle = $pageTitle ?? 'Sizo Technology — Sizo Software';
 $pageDesc = $pageDesc ?? 'Soluções modernas para gestão empresarial, facturação, stock e operações comerciais.';
-
-// Comentário em `<head>`: no site em produção usa «Ver código-fonte» e confere `sizo-deploy` com `git log -1 --oneline`.
-$sizoGitRef = 'no-git';
-$gitHeadFile = dirname(__DIR__) . DIRECTORY_SEPARATOR . '.git' . DIRECTORY_SEPARATOR . 'HEAD';
-if (is_readable($gitHeadFile)) {
-    $gitHead = trim((string) file_get_contents($gitHeadFile));
-    if (strpos($gitHead, 'ref:') === 0) {
-        $refRel = trim(substr($gitHead, 4));
-        $refPath = dirname(__DIR__) . DIRECTORY_SEPARATOR . '.git' . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $refRel);
-        if (is_readable($refPath)) {
-            $sizoGitRef = substr(trim((string) file_get_contents($refPath)), 0, 7);
-        }
-    } elseif ($gitHead !== '') {
-        $sizoGitRef = substr($gitHead, 0, 7);
-    }
-}
 ?>
 <!DOCTYPE html>
 <html lang="pt">
 <head>
-  <!-- sizo-deploy <?php echo htmlspecialchars($sizoGitRef, ENT_QUOTES, 'UTF-8'); ?> -->
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="<?= htmlspecialchars($pageDesc, ENT_QUOTES, 'UTF-8') ?>">
