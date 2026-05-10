@@ -1,4 +1,10 @@
 <?php
+// Evita que proxies/CDN/browser sirva HTML antigo após deploy (Cloudways, Breeze, etc.).
+if (!headers_sent()) {
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+}
+
 $pageTitle = 'Sizo Technology — Sizo Software';
 $pageDesc = 'Soluções modernas para gestão empresarial, facturação, stock e operações comerciais.';
 $sizoCfg = require __DIR__ . '/config/planos.php';
