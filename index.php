@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 if (!headers_sent()) {
     header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
     header('Pragma: no-cache');
@@ -15,8 +15,13 @@ $sizoWhatsAppUrl = $sizoContacto['whatsapp_url'];
 $sizoAppUrl = $sizoContacto['app_url'] ?? 'https://app.sizotech.net';
 $sizoFaq = require __DIR__ . '/config/faq.php';
 $sizoFunc = require __DIR__ . '/config/funcionalidades.php';
-require_once __DIR__ . '/config/companies.php';
-$sizoEmpresas = sizo_fetch_client_companies();
+$sizoEmpresas = [];
+try {
+    require_once __DIR__ . '/config/companies.php';
+    $sizoEmpresas = sizo_fetch_client_companies();
+} catch (Throwable $e) {
+    error_log('[sizo-page] companies load failed: ' . $e->getMessage());
+}
 
 $demoMailto = $sizoMailtoBase . '?subject=' . rawurlencode('Demonstração - Sizo Software');
 $startMailto = $sizoMailtoBase . '?subject=' . rawurlencode('Começar gratuitamente - Sizo Software');
