@@ -1,74 +1,74 @@
 <?php
 /**
- * Planos Sizo Software — preços por parcela mensal (licença anual ÷ 12).
- * Contactos e textos legais/comerciais.
+ * Planos Sizo Software · preços por parcela mensal (licença anual ÷ 12).
  */
 return [
     'contacto' => [
         'email' => 'info@sizotech.net',
-        /** Formato internacional Moçambique */
         'telefone_display' => '+258 84 025 5253',
         'telefone_href' => 'tel:+258840255253',
-        /** Ligações «Contacto» e número clicável abrem o WhatsApp Web / app */
         'whatsapp_url' => 'https://wa.me/258840255253?' . http_build_query([
             'text' => 'Olá! Gostaria de mais informações sobre o Sizo Software.',
         ]),
+        'app_url' => 'https://app.sizotech.net',
     ],
 
-    'nota_licenca' => 'A licença de uso é contratada por período anual. O valor total é dividido em 12 prestações mensais iguais — os valores indicados são o montante de cada parcela mensal (MT/mês).',
+    'nota_licenca' => 'A licença é anual. O valor total é dividido em 12 prestações mensais iguais. Os preços abaixo são a parcela mensal (MT/mês).',
 
-    /**
-     * Planos: LITE = 1 módulo à escolha | STANDARD = 2 módulos | PRO = os 3 módulos.
-     */
     'planos' => [
         [
-            'id' => 'lite',
-            'nome' => 'LITE',
+            'id' => 'starter',
+            'nome' => 'Starter',
             'titulo_card' => 'Um módulo à escolha',
             'tipo' => 'LITE',
             'preco_mt' => '1 999,00',
             'preco_periodo' => '/ mês',
             'destaque' => false,
             'ativo' => true,
-            'resumo' => 'Seleccione apenas um eixo: produtos & stock, serviços em catálogo, ou serviços livres — consoante o perfil da sua empresa.',
+            'resumo' => 'Ideal para começar: active um eixo (produtos e stock, serviços em catálogo ou serviço livre).',
             'bullets' => [
-                'Escolhe 1 entre: Produtos · Serviços (catálogo) · Serviço livre',
-                'Funcionalidades completas dentro do módulo seleccionado',
+                '1 módulo à escolha (Produtos, Serviços ou Serviço livre)',
+                'Facturação e documentos essenciais',
+                'Utilizadores e permissões',
+                'Suporte por e-mail / WhatsApp',
             ],
         ],
         [
-            'id' => 'standard',
-            'nome' => 'STANDARD',
+            'id' => 'business',
+            'nome' => 'Business',
             'titulo_card' => 'Dois módulos combinados',
             'tipo' => 'STANDARD',
             'preco_mt' => '2 499,00',
             'preco_periodo' => '/ mês',
-            'destaque' => false,
+            'destaque' => true,
             'ativo' => true,
-            'resumo' => 'Combine dois dos três módulos para alinhar stock, catálogo de serviços e vendas livres à sua operação.',
+            'resumo' => 'Para empresas com operação cruzada: combine dois módulos e cubra stock e serviços no mesmo plano.',
             'bullets' => [
-                'Até 2 módulos activos à sua escolha (entre os 3 disponíveis)',
-                'Indicado para empresas com operações cruzadas',
+                'Até 2 módulos activos em simultâneo',
+                'POS, inventário e relatórios',
+                'Automação e fecho de caixa',
+                'Multiempresa e multiutilizador',
             ],
         ],
         [
-            'id' => 'pro',
-            'nome' => 'PRO',
+            'id' => 'enterprise',
+            'nome' => 'Enterprise',
             'titulo_card' => 'Suite completa',
             'tipo' => 'PRO',
             'preco_mt' => '3 499,00',
             'preco_periodo' => '/ mês',
-            'destaque' => true,
+            'destaque' => false,
             'ativo' => true,
-            'resumo' => 'Acesso integral: produtos, serviços em catálogo e serviços livres — máxima flexibilidade num único plano.',
+            'resumo' => 'Acesso integral: produtos, serviços em catálogo e serviço livre. Máxima flexibilidade.',
             'bullets' => [
-                'Os 3 módulos incluídos: Produtos + Serviços (catálogo) + Serviço livre',
-                'Para organizações que querem cobrir todas as linhas de negócio',
+                'Os 3 módulos incluídos',
+                'Todas as funcionalidades do produto',
+                'Prioridade no onboarding',
+                'Para organizações em crescimento',
             ],
         ],
     ],
 
-    /** Linhas da tabela comparativa (colunas fixas LITE | STANDARD | PRO) */
     'comparacao' => [
         [
             'criterio' => 'Parcela mensal (÷ 12 meses)',
@@ -78,30 +78,30 @@ return [
             'destaque' => true,
         ],
         [
-            'criterio' => 'Quantos módulos pode activar',
+            'criterio' => 'Módulos activos',
             'lite' => '1 (escolhe qual)',
-            'standard' => '2 (combinação à escolha)',
+            'standard' => '2 (combinação)',
             'pro' => '3 (todos)',
             'destaque' => false,
         ],
         [
             'criterio' => 'Produtos & inventário',
-            'lite' => 'Se escolher como único módulo',
-            'standard' => 'Sim, se integrar na sua combinação',
+            'lite' => 'Se escolher o módulo',
+            'standard' => 'Na sua combinação',
             'pro' => 'Incluído',
             'destaque' => false,
         ],
         [
             'criterio' => 'Serviços (catálogo)',
-            'lite' => 'Se escolher como único módulo',
-            'standard' => 'Sim, se integrar na sua combinação',
+            'lite' => 'Se escolher o módulo',
+            'standard' => 'Na sua combinação',
             'pro' => 'Incluído',
             'destaque' => false,
         ],
         [
             'criterio' => 'Serviço livre',
-            'lite' => 'Se escolher como único módulo',
-            'standard' => 'Sim, se integrar na sua combinação',
+            'lite' => 'Se escolher o módulo',
+            'standard' => 'Na sua combinação',
             'pro' => 'Incluído',
             'destaque' => false,
         ],

@@ -1,6 +1,6 @@
 <?php
-$pageTitle = $pageTitle ?? 'Sizo Technology — Sizo Software';
-$pageDesc = $pageDesc ?? 'Soluções modernas para gestão empresarial, facturação, stock e operações comerciais.';
+$pageTitle = $pageTitle ?? 'Sizo Software | Gestão e Facturação Empresarial';
+$pageDesc = $pageDesc ?? 'ERP cloud para vendas, inventário, clientes, caixa, documentos fiscais e relatórios numa única plataforma.';
 ?>
 <!DOCTYPE html>
 <html lang="pt">
@@ -11,24 +11,20 @@ $pageDesc = $pageDesc ?? 'Soluções modernas para gestão empresarial, factura�
   <title><?= htmlspecialchars($pageTitle, ENT_QUOTES, 'UTF-8') ?></title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
       theme: {
         extend: {
-          fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
+          fontFamily: { sans: ['Manrope', 'system-ui', 'sans-serif'] },
           colors: {
-            brand: { blue: '#2563eb', orange: '#f97316', dark: '#0a0f1a' }
+            brand: { DEFAULT: '#2563EB', soft: '#EFF6FF', muted: '#DBEAFE' }
           },
           boxShadow: {
-            'glow': '0 0 80px -12px rgba(37, 99, 235, 0.55)',
-            'glow-sm': '0 0 40px -8px rgba(37, 99, 235, 0.4)',
-            'card': '0 25px 50px -12px rgba(0, 0, 0, 0.35)',
-          },
-          animation: { 'float': 'float 6s ease-in-out infinite' },
-          keyframes: {
-            float: { '0%, 100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-12px)' } }
+            'soft': '0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px rgba(15, 23, 42, 0.06)',
+            'lift': '0 12px 40px rgba(37, 99, 235, 0.12)',
+            'card': '0 4px 24px rgba(15, 23, 42, 0.06)',
           }
         }
       }

@@ -1,38 +1,38 @@
 <?php
 /**
- * Perguntas frequentes — edite aqui os textos.
+ * Perguntas frequentes · foco no produto.
  */
 return [
     [
         'pergunta' => 'O que é o Sizo Software?',
-        'resposta' => 'É uma plataforma SaaS para gestão empresarial: facturação, stock, relatórios, utilizadores e permissões, com dashboard moderno. Funciona no navegador, sem instalação local obrigatória.',
+        'resposta' => 'É um ERP cloud para gestão e facturação: vendas, inventário, clientes, serviços, caixa, documentos fiscais, automações e relatórios numa única plataforma.',
     ],
     [
-        'pergunta' => 'Preciso de instalar algo no meu computador?',
-        'resposta' => 'Não. O acesso é via navegador web em ambiente seguro. Basta internet e credenciais da sua organização.',
+        'pergunta' => 'Preciso de instalar algo?',
+        'resposta' => 'Não. Funciona no navegador. Basta internet e as credenciais da sua empresa.',
     ],
     [
-        'pergunta' => 'Em que consistem os planos LITE, STANDARD e PRO?',
-        'resposta' => 'Os três planos baseiam-se nos mesmos eixos: Produtos (stock/catálogo), Serviços em catálogo e Serviço livre. LITE inclui apenas um destes módulos à sua escolha; STANDARD permite dois módulos activos em simultâneo; PRO inclui os três. Veja o comparativo na secção Planos.',
+        'pergunta' => 'Qual a diferença entre Starter, Business e Enterprise?',
+        'resposta' => 'Correspondem aos planos LITE, STANDARD e PRO. Starter activa 1 módulo; Business activa 2; Enterprise inclui os 3 (produtos, serviços em catálogo e serviço livre).',
     ],
     [
         'pergunta' => 'Os preços são mensais ou anuais?',
-        'resposta' => 'A licença é contratada por período anual. O valor total é repartido em 12 prestações mensais iguais — os valores publicados na página correspondem ao montante de cada parcela mensal (MT/mês).',
+        'resposta' => 'A licença é anual. O valor é repartido em 12 prestações mensais iguais. Os preços na página são a parcela mensal (MT/mês).',
     ],
     [
-        'pergunta' => 'Posso gerir várias empresas na mesma conta?',
-        'resposta' => 'Sim. A plataforma suporta contexto multiempresa e permissões por utilizador, para separar dados e operações conforme a sua governança.',
+        'pergunta' => 'Posso gerir várias empresas?',
+        'resposta' => 'Sim. O Sizo suporta multiempresa com permissões por utilizador, para separar dados e operações.',
     ],
     [
-        'pergunta' => 'Os meus dados ficam seguros?',
-        'resposta' => 'A arquitectura segue boas práticas para serviços cloud: controlos de acesso, comunicação encriptada em HTTPS e políticas de permissões. Detalhes contratuais e RGPD são tratados na proposta comercial.',
+        'pergunta' => 'Os dados ficam seguros?',
+        'resposta' => 'Sim: acesso por HTTPS, controlos de permissões e isolamento por empresa. Detalhes contratuais são tratados na proposta comercial.',
     ],
     [
-        'pergunta' => 'Como peço uma demonstração ou esclarecimentos?',
-        'resposta' => 'Use «Solicitar demonstração», envie e-mail para info@sizotech.net ou fale connosco pelo WhatsApp (número no rodapé). Indique o sector da empresa e o plano que está a considerar.',
+        'pergunta' => 'Como peço uma demonstração?',
+        'resposta' => 'Clique em «Ver demonstração» ou «Solicitar demonstração», envie e-mail para info@sizotech.net ou fale pelo WhatsApp. Indique o sector e o plano que está a considerar.',
     ],
     [
-        'pergunta' => 'Posso exportar relatórios ou dados?',
-        'resposta' => 'Sim. O sistema inclui relatórios detalhados e exportação onde aplicável (por exemplo CSV ou vistas imprimíveis), conforme o módulo activo no seu plano e as permissões do seu utilizador.',
+        'pergunta' => 'Posso exportar documentos e relatórios?',
+        'resposta' => 'Sim. Há PDF, impressão e exportações onde aplicável, conforme o módulo activo e as permissões do utilizador.',
     ],
 ];
