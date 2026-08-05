@@ -84,9 +84,18 @@ function sizo_fetch_client_companies(int $limit = 48): array
         $initials = trim((string) ($row['initials'] ?? ''));
         if ($initials === '') {
             $parts = preg_split('/\s+/u', $name) ?: [];
-            $initials = mb_strtoupper(mb_substr($parts[0] ?? $name, 0, 1));
-            if (isset($parts[1])) {
-                $initials .= mb_strtoupper(mb_substr($parts[1], 0, 1));
+            $first = (string) ($parts[0] ?? $name);
+            $second = (string) ($parts[1] ?? '');
+            if (function_exists('mb_substr')) {
+                $initials = mb_strtoupper(mb_substr($first, 0, 1));
+                if ($second !== '') {
+                    $initials .= mb_strtoupper(mb_substr($second, 0, 1));
+                }
+            } else {
+                $initials = strtoupper(substr($first, 0, 1));
+                if ($second !== '') {
+                    $initials .= strtoupper(substr($second, 0, 1));
+                }
             }
         }
         $out[] = [
