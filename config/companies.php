@@ -20,26 +20,41 @@ function sizo_db(): ?PDO
     $pass = sizo_env('DB_PASS', '');
 
     if ($name === '' || $user === '') {
+        error_log('[sizo-page] DB not configured (DB_NAME/DB_USER vazios). Crie o ficheiro .env no servidor.');
         return null;
     }
 
     try {
-        $pdo = new PDO(
-            sprintf('mysql:host=%s;port=%s;dbname=%s;charset=utf8mb4', $host, $port, $name),
-            $user,
-            $pass ?? '',
-            [
-                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                PDO::ATTR_TIMEOUT => 3,
-            ]
-        );
+        $dsn = sprintf('mysql:host=%s;port=%s;dbname=%s;charset=utf8mb4', $host, $port, $name);
+        $pdo = new PDO($dsn, $user, (string) $pass, [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        ]);
     } catch (Throwable $e) {
         $pdo = null;
         error_log('[sizo-page] DB connection failed: ' . $e->getMessage());
     }
 
     return $pdo;
+}
+
+/**
+ * @return list<string>
+ */
+function sizo_company_columns(PDO $db): array
+{
+    static $cols = null;
+    if ($cols !== null) {
+        return $cols;
+    }
+    try {
+        $cols = $db->query('SHOW COLUMNS FROM companies')->fetchAll(PDO::FETCH_COLUMN) ?: [];
+        $cols = array_map('strval', $cols);
+    } catch (Throwable $e) {
+        $cols = [];
+        error_log('[sizo-page] SHOW COLUMNS companies failed: ' . $e->getMessage());
+    }
+    return $cols;
 }
 
 /**
@@ -54,22 +69,45 @@ function sizo_fetch_client_companies(int $limit = 48): array
         return [];
     }
 
+    $cols = sizo_company_columns($db);
+    if ($cols === [] || !in_array('id', $cols, true) || !in_array('name', $cols, true)) {
+        error_log('[sizo-page] Tabela companies inacessível ou sem colunas esperadas.');
+        return [];
+    }
+
+    $select = ['id', 'name'];
+    foreach (['subdomain', 'logo', 'initials', 'business_area', 'status', 'type', 'is_demo'] as $col) {
+        if (in_array($col, $cols, true)) {
+            $select[] = $col;
+        }
+    }
+
+    $where = ['1=1'];
+    if (in_array('status', $cols, true)) {
+        $where[] = "status = 'active'";
+    }
+    if (in_array('is_demo', $cols, true)) {
+        $where[] = 'COALESCE(is_demo, 0) = 0';
+    }
+    if (in_array('type', $cols, true)) {
+        // Inclui client e NULL/vazio; exclui apenas internal
+        $where[] = "(type IS NULL OR type = '' OR type = 'client')";
+    }
+    if (in_array('subdomain', $cols, true)) {
+        $where[] = "LOWER(COALESCE(subdomain, '')) NOT IN ('app', 'admin')";
+    }
+
+    $sql = sprintf(
+        'SELECT %s FROM companies WHERE %s ORDER BY name ASC LIMIT %d',
+        implode(', ', $select),
+        implode(' AND ', $where),
+        max(1, min(100, $limit))
+    );
+
     try {
-        $stmt = $db->prepare(
-            "SELECT id, name, subdomain, logo, initials, business_area
-             FROM companies
-             WHERE status = 'active'
-               AND COALESCE(is_demo, 0) = 0
-               AND COALESCE(type, 'client') = 'client'
-               AND LOWER(subdomain) <> 'app'
-             ORDER BY name ASC
-             LIMIT ?"
-        );
-        $stmt->bindValue(1, $limit, PDO::PARAM_INT);
-        $stmt->execute();
-        $rows = $stmt->fetchAll();
+        $rows = $db->query($sql)->fetchAll();
     } catch (Throwable $e) {
-        error_log('[sizo-page] companies query failed: ' . $e->getMessage());
+        error_log('[sizo-page] companies query failed: ' . $e->getMessage() . ' SQL=' . $sql);
         return [];
     }
 
@@ -104,7 +142,7 @@ function sizo_fetch_client_companies(int $limit = 48): array
             'subdomain' => (string) ($row['subdomain'] ?? ''),
             'logo' => $logo !== '' ? $logo : null,
             'initials' => $initials,
-            'business_area' => ($row['business_area'] ?? null) ? (string) $row['business_area'] : null,
+            'business_area' => !empty($row['business_area']) ? (string) $row['business_area'] : null,
             'logo_url' => $logo !== '' ? ('company-logo.php?id=' . $id) : null,
         ];
     }
