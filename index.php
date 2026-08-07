@@ -80,12 +80,12 @@ require __DIR__ . '/includes/head.php';
 <main>
   <!-- 1. HERO -->
   <section class="hero-surface relative overflow-hidden pt-28 pb-16 sm:pt-32 sm:pb-20 lg:pb-24">
-    <div class="grid w-full items-center gap-10 px-4 sm:px-6 lg:grid-cols-2 lg:gap-12 lg:px-8 xl:gap-16 xl:px-10">
-      <div class="max-w-xl" data-aos="fade-up">
-        <h1 class="text-4xl font-extrabold tracking-tight text-slate-900 sm:text-5xl lg:text-[3.1rem] lg:leading-[1.12]">
+    <div class="mx-auto grid max-w-6xl items-center gap-10 px-4 sm:px-6 lg:grid-cols-2 lg:gap-12 lg:px-8">
+      <div data-aos="fade-up">
+        <h1 class="text-4xl font-extrabold tracking-tight text-slate-900 sm:text-5xl lg:text-[3.05rem] lg:leading-[1.12]">
           Gestão e Facturação Empresarial sem complicações.
         </h1>
-        <p class="mt-5 text-lg leading-relaxed text-slate-600">
+        <p class="mt-5 max-w-md text-lg leading-relaxed text-slate-600">
           Controle vendas, inventário, clientes, serviços, caixa, documentos fiscais e relatórios numa única plataforma.
         </p>
         <div class="mt-8 flex flex-wrap items-center gap-3">
@@ -98,17 +98,16 @@ require __DIR__ . '/includes/head.php';
         </div>
       </div>
 
-      <div class="hero-shot-wrap relative w-full" data-aos="fade-left" data-aos-delay="80">
-        <div class="absolute -inset-3 rounded-[1.5rem] bg-blue-500/10 blur-2xl"></div>
-        <div class="relative overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-lift ring-1 ring-slate-900/5">
-          <div class="browser-bar flex items-center gap-2 px-4 py-2.5">
-            <span class="h-2.5 w-2.5 rounded-full bg-slate-300"></span>
-            <span class="h-2.5 w-2.5 rounded-full bg-slate-300"></span>
-            <span class="h-2.5 w-2.5 rounded-full bg-slate-300"></span>
-            <span class="ml-3 flex-1 truncate rounded-md bg-white px-3 py-1 text-xs text-slate-400 ring-1 ring-slate-200">app.sizotech.net</span>
+      <div class="hero-laptop-wrap" data-aos="fade-left" data-aos-delay="80">
+        <div class="hero-laptop" aria-hidden="false">
+          <div class="hero-laptop-screen">
+            <span class="hero-laptop-camera" aria-hidden="true"></span>
+            <div class="hero-laptop-display">
+              <img src="assets/screenshots/hero-dashboard.png" alt="Dashboard Sizo Software no portátil" class="hero-shot" width="1200" height="760" fetchpriority="high">
+            </div>
           </div>
-          <div class="hero-shot-frame overflow-hidden bg-slate-50">
-            <img src="assets/screenshots/hero-dashboard.png" alt="Dashboard Sizo Software" class="hero-shot block h-full w-full object-cover object-top" width="1200" height="760" fetchpriority="high">
+          <div class="hero-laptop-base">
+            <span class="hero-laptop-notch" aria-hidden="true"></span>
           </div>
         </div>
       </div>
