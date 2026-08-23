@@ -11,13 +11,13 @@ $pageDesc = $pageDesc ?? 'ERP cloud para vendas, inventário, clientes, caixa, d
   <title><?= htmlspecialchars($pageTitle, ENT_QUOTES, 'UTF-8') ?></title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
       theme: {
         extend: {
-          fontFamily: { sans: ['Manrope', 'system-ui', 'sans-serif'] },
+          fontFamily: { sans: ['Montserrat', 'system-ui', 'sans-serif'] },
           colors: {
             brand: { DEFAULT: '#2563EB', soft: '#EFF6FF', muted: '#DBEAFE' }
           },

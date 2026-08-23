@@ -52,9 +52,7 @@ body {
 /* Hero atmosphere */
 .hero-surface {
   background:
-    radial-gradient(ellipse 70% 50% at 85% 20%, rgba(37, 99, 235, 0.12), transparent 55%),
-    radial-gradient(ellipse 50% 40% at 10% 80%, rgba(59, 130, 246, 0.08), transparent 50%),
-    linear-gradient(180deg, #ffffff 0%, #f8fafc 55%, #ffffff 100%);
+    #ffffff;
 }
 
 /* Laptop mockup */
@@ -265,6 +263,29 @@ body {
 
 body.modal-open {
   overflow: hidden;
+}
+
+/* Subscription modal */
+.signup-modal {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.22s ease, visibility 0.22s ease;
+}
+
+.signup-modal > div {
+  transform: translateY(14px) scale(0.98);
+  transition: transform 0.26s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.signup-modal.is-open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.signup-modal.is-open > div {
+  transform: translateY(0) scale(1);
 }
 
 /* Checklist pills */
