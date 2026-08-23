@@ -41,7 +41,10 @@ function sizo_load_env(?string $path = null): void
             continue;
         }
         $_ENV[$key] = $value;
-        putenv($key . '=' . $value);
+        // Alguns ambientes partilhados desativam putenv(); $_ENV já é usado por sizo_env().
+        if (function_exists('putenv')) {
+            putenv($key . '=' . $value);
+        }
     }
 }
 
