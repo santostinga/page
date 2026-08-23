@@ -1,4 +1,9 @@
 <?php
+// Diagnóstico temporário: remover após identificar o erro em produção.
+ini_set('display_errors', '1');
+ini_set('display_startup_errors', '1');
+error_reporting(E_ALL);
+
 session_start();
 if (!headers_sent()) {
     header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
