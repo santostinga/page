@@ -4,7 +4,8 @@ require_once __DIR__ . '/env.php';
 function sizo_system_api(string $method, string $path, ?array $payload = null, ?string $idempotencyKey = null): array
 {
     $base = rtrim((string) sizo_env('SIZO_SYSTEM_URL', ''), '/');
-    $token = (string) sizo_env('SIZO_SYSTEM_API_TOKEN', '');
+    // Aceita o nome inicial API_KEY e o nome explícito API_TOKEN durante a transição.
+    $token = (string) sizo_env('SIZO_SYSTEM_API_TOKEN', sizo_env('SIZO_SYSTEM_API_KEY', ''));
     if ($base === '' || $token === '') {
         error_log('[sizo-page] Sizo system API is not configured.');
         return ['ok' => false, 'status' => 503, 'data' => []];
