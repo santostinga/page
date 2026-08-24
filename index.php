@@ -68,6 +68,15 @@ require __DIR__ . '/includes/head.php';
     </div>
   </section>
 
+  <section id="empresas" class="scroll-mt-24 border-y border-slate-100 bg-white py-20 sm:py-28">
+    <div class="mx-auto max-w-7xl px-5 sm:px-8 lg:px-10">
+      <div class="mx-auto max-w-3xl text-center" data-aos="fade-up"><span class="text-sm font-semibold text-brand">Empresas na plataforma</span><h2 class="mt-4 text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">Empresas que já utilizam o Sizotech</h2><p class="mx-auto mt-5 max-w-2xl text-base leading-7 text-slate-600 sm:text-lg">Empresas utilizam o Sizotech para simplificar processos, organizar operações e acompanhar a gestão do seu negócio.</p></div>
+      <p id="companies-loading" class="mt-12 text-center text-sm text-slate-500">A carregar empresas…</p><div id="companies-list" class="hidden mx-auto mt-14 grid max-w-5xl gap-3 sm:grid-cols-2 lg:grid-cols-4"></div>
+      <div id="companies-count-wrap" class="hidden mt-12 flex justify-center" data-aos="fade-up"><div class="inline-flex items-center gap-4 rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4"><span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white text-brand shadow-sm"><svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-4M9 9h.01M9 13h.01M9 17h.01"/></svg></span><div class="text-left"><div id="companies-count" class="text-lg font-semibold tracking-tight text-slate-950"></div><div class="mt-0.5 text-sm text-slate-500">já fazem parte do Sizotech</div></div></div></div>
+      <p id="companies-note" class="hidden mx-auto mt-10 max-w-2xl text-center text-sm leading-6 text-slate-500">Uma plataforma criada para acompanhar empresas em diferentes fases do seu crescimento.</p>
+    </div>
+  </section>
+
   <section id="planos" class="section-band section-band--white scroll-mt-24 py-20 sm:py-28">
     <div class="mx-auto max-w-6xl px-5 sm:px-8">
       <div class="mx-auto max-w-2xl text-center" data-aos="fade-up"><p class="text-sm font-semibold uppercase tracking-[0.18em] text-brand">Planos</p><h2 class="mt-3 text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">Escolha o plano ideal para si</h2><p class="mt-4 text-base leading-relaxed text-slate-600">Todos os planos incluem o sistema completo. Escolha de acordo com o ritmo da sua empresa.</p></div>

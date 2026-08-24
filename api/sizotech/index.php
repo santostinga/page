@@ -34,6 +34,26 @@ try {
         $result = $client->request('GET', '/registration-options');
         sizo_api_reply($result['status'], $result['body']);
     }
+    if ($method === 'GET' && $route === 'companies') {
+        $companies = [];
+        $page = 1;
+        $totalPages = 1;
+        do {
+            $result = $client->request('GET', '/companies?page=' . $page . '&per_page=100');
+            if ($result['status'] < 200 || $result['status'] >= 300) {
+                sizo_api_reply($result['status'], $result['body']);
+            }
+            foreach (($result['body']['data'] ?? []) as $company) {
+                $companies[] = [
+                    'name' => (string) ($company['name'] ?? ''),
+                    'logo_url' => isset($company['logo_url']) ? (string) $company['logo_url'] : null,
+                ];
+            }
+            $totalPages = max(1, (int) ($result['body']['meta']['total_pages'] ?? 1));
+            $page++;
+        } while ($page <= $totalPages && $page <= 100);
+        sizo_api_reply(200, ['status' => 'ok', 'data' => $companies, 'meta' => ['total' => count($companies)]]);
+    }
     if ($method === 'GET' && $route === 'subdomains/suggest') {
         $name = trim((string) ($_GET['name'] ?? ''));
         $result = $client->request('GET', '/subdomains/suggest?name=' . rawurlencode($name));
