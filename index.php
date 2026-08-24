@@ -78,8 +78,8 @@ require __DIR__ . '/includes/head.php';
   </section>
 </main>
 
-<div id="plan-picker-modal" class="signup-modal fixed inset-0 z-[65] overflow-y-auto bg-slate-950/50 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="plan-picker-title">
-  <div class="mx-auto my-6 w-full max-w-5xl rounded-2xl bg-white shadow-2xl sm:my-10"><div class="flex items-start justify-between border-b border-slate-100 px-6 py-5"><div><p class="text-sm font-semibold text-brand">Comece agora</p><h2 id="plan-picker-title" class="mt-1 text-xl font-bold text-slate-950">Escolha o plano ideal para si</h2><p class="mt-1 text-sm text-slate-600">Pode começar gratuitamente e mudar quando precisar.</p></div><button type="button" data-close-plan-picker class="rounded-lg p-2 text-slate-500 hover:bg-slate-100" aria-label="Fechar">✕</button></div><div id="plan-picker-loading" class="p-10 text-center text-sm text-slate-500">A carregar planos…</div><div id="plan-picker-list" class="hidden grid gap-5 p-6 md:grid-cols-3"></div></div>
+<div id="plan-picker-modal" class="signup-modal fixed inset-0 z-[65] flex items-center justify-center overflow-y-auto bg-slate-950/50 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="plan-picker-title">
+  <div class="w-full max-w-5xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white shadow-2xl"><div class="flex items-start justify-between border-b border-slate-100 px-6 py-5"><div><p class="text-sm font-semibold text-brand">Comece agora</p><h2 id="plan-picker-title" class="mt-1 text-xl font-bold text-slate-950">Escolha o plano ideal para si</h2></div><button type="button" data-close-plan-picker class="rounded-lg p-2 text-slate-500 hover:bg-slate-100" aria-label="Fechar">✕</button></div><div id="plan-picker-loading" class="p-10 text-center text-sm text-slate-500">A carregar planos…</div><div id="plan-picker-list" class="hidden grid gap-5 p-6 md:grid-cols-3"></div></div>
 </div>
 
 <div id="signup-modal" class="signup-modal fixed inset-0 z-[70] overflow-y-auto bg-slate-950/50 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="signup-title">
