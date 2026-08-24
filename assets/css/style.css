@@ -223,6 +223,7 @@ body {
 }
 
 .signup-plan-card {
+  cursor: pointer;
   transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease, background 0.22s ease;
 }
 
@@ -235,6 +236,11 @@ body {
 
 .signup-plan-card:hover button {
   background: #2563eb;
+}
+
+.signup-plan-card:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, 0.35);
+  outline-offset: 3px;
 }
 
 /* FAQ */
