@@ -15,8 +15,9 @@
       card.className = 'company-showcase-card flex min-h-[82px] items-center gap-4 rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-card';
       var logo = document.createElement('div');
       logo.className = 'flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-100 bg-slate-50 p-1.5 text-sm font-bold text-slate-400';
-      var fallback = document.createElement('span');
-      fallback.textContent = String(company.name || '?').trim().slice(0, 1).toUpperCase() || '?';
+      var fallback = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      fallback.setAttribute('viewBox', '0 0 24 24'); fallback.setAttribute('fill', 'none'); fallback.setAttribute('stroke', 'currentColor'); fallback.setAttribute('stroke-width', '1.8'); fallback.setAttribute('aria-hidden', 'true'); fallback.classList.add('h-5', 'w-5');
+      fallback.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-4M9 9h.01M9 13h.01M9 17h.01"/>';
       logo.appendChild(fallback);
       if (company.logo_url) {
         var image = document.createElement('img');
