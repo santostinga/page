@@ -8,35 +8,11 @@ if (!headers_sent()) {
 $pageTitle = 'Sizo Software | Gestão empresarial simples';
 $pageDesc = 'Software simples, funcional e adaptável para gerir a sua empresa.';
 $sizoCfg = require __DIR__ . '/config/planos.php';
-$planos = [];
 $sizoContacto = $sizoCfg['contacto'];
 $sizoMailtoBase = 'mailto:' . rawurlencode($sizoContacto['email']);
 $sizoWhatsAppUrl = $sizoContacto['whatsapp_url'];
 $startMailto = $sizoMailtoBase . '?subject=' . rawurlencode('Iniciar gratuitamente - Sizo Software');
 $_SESSION['signup_csrf'] = bin2hex(random_bytes(32));
-$_SESSION['signup_idempotency'] = 'signup-' . bin2hex(random_bytes(16));
-
-require_once __DIR__ . '/config/system_api.php';
-$planosResponse = sizo_system_api('GET', '/api/v1/plans');
-if (!empty($planosResponse['ok'])) {
-    $planos = $planosResponse['data']['data'] ?? [];
-}
-$registrationOptionsResponse = sizo_system_api('GET', '/api/v1/registration-options');
-$companyTypeGroups = !empty($registrationOptionsResponse['ok']) ? ($registrationOptionsResponse['data']['data']['company_type_groups'] ?? []) : [];
-$companyTypes = !empty($registrationOptionsResponse['ok']) ? ($registrationOptionsResponse['data']['data']['company_types'] ?? []) : [];
-
-function sizo_plan_price(array $plan): string
-{
-    if (array_key_exists('code', $plan)) {
-        return number_format((float) ($plan['price']['amount'] ?? 0), 2, ',', ' ');
-    }
-    return (string) ($plan['preco_mt'] ?? '0,00');
-}
-
-function sizo_plan_limit(mixed $value): string
-{
-    return $value === null ? 'Ilimitado' : number_format((int) $value, 0, ',', ' ');
-}
 
 require __DIR__ . '/includes/head.php';
 ?>
@@ -50,7 +26,7 @@ require __DIR__ . '/includes/head.php';
       <a href="#planos" class="text-sm font-medium text-slate-600 transition hover:text-slate-900">Planos</a>
     </nav>
     <div class="flex items-center gap-3">
-      <a href="<?= htmlspecialchars($startMailto, ENT_QUOTES, 'UTF-8') ?>" class="hidden rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 md:inline-flex">Inicie gratuitamente</a>
+      <button type="button" data-open-plan-picker class="hidden rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 md:inline-flex">Inicie gratuitamente</button>
       <button type="button" id="mobile-menu-btn" class="inline-flex rounded-lg border border-slate-200 p-2 text-slate-700 md:hidden" aria-expanded="false" aria-controls="mobile-nav" aria-label="Abrir menu"><svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg></button>
     </div>
   </div>
@@ -64,7 +40,7 @@ require __DIR__ . '/includes/head.php';
     <div class="relative z-20 mx-auto max-w-6xl px-5 sm:px-8 lg:px-8"><div class="max-w-xl" data-aos="fade-up">
       <h1 class="text-4xl font-bold tracking-tight text-slate-950 sm:text-5xl lg:text-[3.45rem] lg:leading-[1.08]">Sizo Software</h1>
       <p class="mt-6 max-w-lg text-base font-medium leading-relaxed text-slate-700 sm:text-lg">Gerencie a sua empresa com maior facilidade usando um software <span class="font-bold text-brand">simples</span>, <span class="font-bold text-brand">funcional</span> e que <span class="font-bold text-brand">se adapta à sua empresa</span>.</p>
-      <div class="mt-8"><a href="<?= htmlspecialchars($startMailto, ENT_QUOTES, 'UTF-8') ?>" class="inline-flex items-center justify-center rounded-lg bg-slate-950 px-6 py-3.5 text-sm font-semibold text-white shadow-soft transition hover:bg-slate-800">Inicie gratuitamente</a></div>
+      <div class="mt-8"><button type="button" data-open-plan-picker class="inline-flex items-center justify-center rounded-lg bg-slate-950 px-6 py-3.5 text-sm font-semibold text-white shadow-soft transition hover:bg-slate-800">Inicie gratuitamente</button></div>
       <a href="#planos" class="group mt-8 inline-flex items-center gap-3 text-sm font-bold text-slate-950 transition hover:text-brand"><span class="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-slate-950 text-white transition group-hover:bg-brand" aria-hidden="true"><svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m9 18 6-6-6-6"/></svg></span>Veja preços e planos</a>
     </div></div>
   </section>
@@ -95,39 +71,16 @@ require __DIR__ . '/includes/head.php';
   <section id="planos" class="section-band section-band--white scroll-mt-24 py-20 sm:py-28">
     <div class="mx-auto max-w-6xl px-5 sm:px-8">
       <div class="mx-auto max-w-2xl text-center" data-aos="fade-up"><p class="text-sm font-semibold uppercase tracking-[0.18em] text-brand">Planos</p><h2 class="mt-3 text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">Escolha o plano ideal para si</h2><p class="mt-4 text-base leading-relaxed text-slate-600">Todos os planos incluem o sistema completo. Escolha de acordo com o ritmo da sua empresa.</p></div>
-      <?php if ($planos === []): ?>
-      <p class="mx-auto mt-10 max-w-xl rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 text-center text-sm text-amber-800">Não foi possível carregar os planos neste momento. Tente novamente dentro de alguns minutos.</p>
-      <?php else: ?>
-      <div class="mt-14 grid gap-5 md:grid-cols-3">
-        <?php foreach ($planos as $index => $plan):
-          $code = strtoupper((string) ($plan['code'] ?? $plan['tipo'] ?? ''));
-          $isStandard = $code === 'STANDARD' || $code === 'BUSINESS';
-          $theme = match ($code) {
-              'FREE', 'STARTER', 'LITE' => ['name' => 'text-emerald-700', 'border' => 'border-emerald-200', 'icon' => 'text-emerald-600', 'button' => 'border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'],
-              'PRO', 'ENTERPRISE' => ['name' => 'text-violet-700', 'border' => 'border-violet-200', 'icon' => 'text-violet-600', 'button' => 'border border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100'],
-              default => ['name' => 'text-brand', 'border' => 'border-blue-300', 'icon' => 'text-brand', 'button' => 'bg-brand text-white hover:bg-blue-600'],
-          };
-          $isDynamic = array_key_exists('code', $plan);
-          $planName = (string) ($plan['name'] ?? $plan['nome'] ?? '');
-          $signupUrl = 'subscricao.php?plan=' . rawurlencode($code);
-        ?>
-        <article class="relative flex flex-col rounded-xl border <?= $theme['border'] ?> bg-white p-6 shadow-soft transition duration-200 hover:-translate-y-1 hover:shadow-xl" data-aos="fade-up" data-aos-delay="<?= $index * 80 ?>">
-          <?php if ($isStandard): ?><span class="absolute right-5 top-5 rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-brand">Mais popular</span><?php endif; ?>
-          <div class="<?= $isStandard ? 'pr-24' : '' ?>"><p class="text-sm font-semibold <?= $theme['name'] ?>"><?= htmlspecialchars($planName, ENT_QUOTES, 'UTF-8') ?></p><div class="mt-2 flex items-baseline gap-1"><span class="text-3xl font-semibold tracking-tight text-slate-950"><?= htmlspecialchars(sizo_plan_price($plan), ENT_QUOTES, 'UTF-8') ?></span><span class="text-sm text-slate-500"><?= htmlspecialchars((string) ($plan['price']['currency'] ?? 'MZN'), ENT_QUOTES, 'UTF-8') ?>/mês</span></div></div>
-          <div class="mt-5 flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-3 text-sm font-medium text-slate-900"><svg class="h-4 w-4 shrink-0 <?= $theme['icon'] ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="m5 13 4 4L19 7"/></svg>Sistema completo incluído</div>
-          <?php if ($isDynamic): ?>
-          <dl class="mt-5 space-y-3 text-sm"><div class="flex items-center justify-between gap-4"><dt class="text-slate-500">Cotações por mês</dt><dd class="font-medium text-slate-900"><?= sizo_plan_limit($plan['quotas']['ct_per_month'] ?? null) ?></dd></div><div class="flex items-center justify-between gap-4"><dt class="text-slate-500">Facturas por mês</dt><dd class="font-medium text-slate-900"><?= sizo_plan_limit($plan['quotas']['ft_per_month'] ?? null) ?></dd></div><div class="flex items-center justify-between gap-4"><dt class="text-slate-500">Vendas por mês</dt><dd class="font-medium text-slate-900"><?= sizo_plan_limit($plan['quotas']['vd_per_month'] ?? null) ?></dd></div></dl>
-          <?php else: ?>
-          <ul class="mt-5 space-y-3 text-sm text-slate-600"><?php foreach (($plan['bullets'] ?? []) as $bullet): ?><li class="flex gap-2"><span class="<?= $theme['icon'] ?>">✓</span><?= htmlspecialchars($bullet, ENT_QUOTES, 'UTF-8') ?></li><?php endforeach; ?></ul>
-          <?php endif; ?>
-          <button type="button" data-signup-open data-plan-code="<?= htmlspecialchars($code, ENT_QUOTES, 'UTF-8') ?>" data-plan-name="<?= htmlspecialchars($planName, ENT_QUOTES, 'UTF-8') ?>" data-plan-price="<?= htmlspecialchars(sizo_plan_price($plan), ENT_QUOTES, 'UTF-8') ?> <?= htmlspecialchars((string) ($plan['price']['currency'] ?? 'MZN'), ENT_QUOTES, 'UTF-8') ?>" data-plan-cycles='<?= htmlspecialchars(json_encode($plan['billing_cycles'] ?? ['monthly']), ENT_QUOTES, 'UTF-8') ?>' class="mt-7 inline-flex w-full items-center justify-center rounded-lg px-4 py-3 text-sm font-semibold transition <?= $theme['button'] ?>">Escolher plano</button>
-        </article>
-        <?php endforeach; ?>
-      </div>
-      <?php endif; ?>
+      <p id="plans-loading" class="mx-auto mt-10 max-w-xl text-center text-sm text-slate-500">A carregar planos…</p>
+      <p id="plans-error" class="hidden mx-auto mt-10 max-w-xl rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 text-center text-sm text-amber-800"></p>
+      <div id="plans-list" class="mt-14 grid gap-5 md:grid-cols-3"></div>
     </div>
   </section>
 </main>
+
+<div id="plan-picker-modal" class="signup-modal fixed inset-0 z-[65] overflow-y-auto bg-slate-950/50 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="plan-picker-title">
+  <div class="mx-auto my-6 w-full max-w-5xl rounded-2xl bg-white shadow-2xl sm:my-10"><div class="flex items-start justify-between border-b border-slate-100 px-6 py-5"><div><p class="text-sm font-semibold text-brand">Comece agora</p><h2 id="plan-picker-title" class="mt-1 text-xl font-bold text-slate-950">Escolha o plano ideal para si</h2><p class="mt-1 text-sm text-slate-600">Pode começar gratuitamente e mudar quando precisar.</p></div><button type="button" data-close-plan-picker class="rounded-lg p-2 text-slate-500 hover:bg-slate-100" aria-label="Fechar">✕</button></div><div id="plan-picker-loading" class="p-10 text-center text-sm text-slate-500">A carregar planos…</div><div id="plan-picker-list" class="hidden grid gap-5 p-6 md:grid-cols-3"></div></div>
+</div>
 
 <div id="signup-modal" class="signup-modal fixed inset-0 z-[70] overflow-y-auto bg-slate-950/50 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="signup-title">
   <div class="mx-auto my-6 w-full max-w-2xl rounded-2xl bg-white shadow-2xl sm:my-10">
@@ -135,12 +88,16 @@ require __DIR__ . '/includes/head.php';
     <form id="signup-form" class="p-6 sm:p-8" novalidate autocomplete="off">
       <input type="hidden" name="csrf" value="<?= htmlspecialchars($_SESSION['signup_csrf'], ENT_QUOTES, 'UTF-8') ?>"><input type="hidden" name="plan_code"><input type="hidden" name="show_legal_designation" value="1">
       <div class="mb-7"><div class="flex items-center gap-2 text-xs font-semibold"><span class="signup-dot flex h-7 w-7 items-center justify-center rounded-full bg-slate-950 text-white" data-step-dot="1">1</span><i class="h-px flex-1 bg-slate-200"></i><span class="signup-dot flex h-7 w-7 items-center justify-center rounded-full bg-slate-200 text-slate-500" data-step-dot="2">2</span><i class="h-px flex-1 bg-slate-200"></i><span class="signup-dot flex h-7 w-7 items-center justify-center rounded-full bg-slate-200 text-slate-500" data-step-dot="3">3</span></div></div>
-      <div data-step="1" class="signup-step grid gap-4 sm:grid-cols-2"><p class="sm:col-span-2 text-sm text-slate-600">Dados principais da empresa.</p><label class="sm:col-span-2 text-sm font-semibold text-slate-700">Nome da empresa <span class="text-red-600" aria-hidden="true">*</span><input required name="name" class="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal"><span class="field-error text-xs text-red-600"></span></label><label class="text-sm font-semibold text-slate-700">Tipo jurídico <span class="text-red-600" aria-hidden="true">*</span><select name="company_type" class="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal"><?php foreach ($companyTypeGroups as $group): ?><optgroup label="<?= htmlspecialchars((string) ($group['label'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"><?php foreach ($companyTypes as $type): if (($type['group'] ?? '') !== ($group['code'] ?? '')) continue; ?><option value="<?= htmlspecialchars((string) $type['code'], ENT_QUOTES, 'UTF-8') ?>" data-requires-other="<?= !empty($type['requires_other']) ? '1' : '0' ?>" <?= ($type['code'] ?? '') === 'LDA' ? 'selected' : '' ?>><?= htmlspecialchars((string) $type['label'], ENT_QUOTES, 'UTF-8') ?></option><?php endforeach; ?></optgroup><?php endforeach; ?></select><span class="field-error text-xs text-red-600"></span></label><label id="company-type-other-wrap" class="hidden text-sm font-semibold text-slate-700">Outro tipo jurídico <span class="text-red-600" aria-hidden="true">*</span><input name="company_type_other" class="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal"><span class="field-error text-xs text-red-600"></span></label><label class="text-sm font-semibold text-slate-700">NUIT <span class="text-red-600" aria-hidden="true">*</span><input name="nuit" class="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal"><span class="field-error text-xs text-red-600"></span></label><label class="sm:col-span-2 text-sm font-semibold text-slate-700">E-mail <span class="text-red-600" aria-hidden="true">*</span><input required type="email" name="email" class="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal"><span class="field-error text-xs text-red-600"></span></label></div>
-      <div data-step="2" class="signup-step hidden grid gap-4 sm:grid-cols-2"><p class="sm:col-span-2 text-sm text-slate-600">Contactos e morada.</p><label class="text-sm font-semibold text-slate-700">Telefone<input name="phone" class="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal"></label><label class="text-sm font-semibold text-slate-700">Telefone alternativo<input name="phone_alt" class="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal"></label><label class="text-sm font-semibold text-slate-700">País<input name="address_country" value="MZ" class="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal"></label><label class="text-sm font-semibold text-slate-700">Província/cidade <span class="text-red-600" aria-hidden="true">*</span><input required name="address_province" class="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal"><span class="field-error text-xs text-red-600"></span></label><label class="sm:col-span-2 text-sm font-semibold text-slate-700">Rua / avenida<input name="address_street" class="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal"></label><label class="text-sm font-semibold text-slate-700">Bairro<input name="address_neighborhood" class="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal"></label><label class="text-sm font-semibold text-slate-700">Número<input name="address_house_number" class="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal"></label></div>
+      <div data-step="1" class="signup-step grid gap-4 sm:grid-cols-2"><p class="sm:col-span-2 text-sm text-slate-600">Dados principais da empresa.</p><label class="sm:col-span-2 text-sm font-semibold text-slate-700">Nome da empresa <span class="text-red-600" aria-hidden="true">*</span><input required name="name" maxlength="150" class="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal"><span class="field-error text-xs text-red-600"></span></label><label class="text-sm font-semibold text-slate-700">Tipo jurídico <span class="text-red-600" aria-hidden="true">*</span><select name="company_type" required class="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal"><option value="">A carregar tipos…</option></select><span class="field-error text-xs text-red-600"></span></label><label id="company-type-other-wrap" class="hidden text-sm font-semibold text-slate-700">Outro tipo jurídico <span class="text-red-600" aria-hidden="true">*</span><input name="company_type_other" maxlength="120" class="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal"><span class="field-error text-xs text-red-600"></span></label><label class="text-sm font-semibold text-slate-700">NUIT <span class="text-red-600" aria-hidden="true">*</span><input name="nuit" inputmode="numeric" maxlength="9" class="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal"><span class="field-error text-xs text-red-600"></span></label><label class="sm:col-span-2 text-sm font-semibold text-slate-700">E-mail <span class="text-red-600" aria-hidden="true">*</span><input required type="email" name="email" maxlength="150" class="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal"><span class="field-error text-xs text-red-600"></span></label></div>
+      <div data-step="2" class="signup-step hidden grid gap-4 sm:grid-cols-2"><p class="sm:col-span-2 text-sm text-slate-600">Contactos, morada e acesso.</p><label class="text-sm font-semibold text-slate-700">Telefone<input name="phone" class="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal"><span class="field-error text-xs text-red-600"></span></label><label class="text-sm font-semibold text-slate-700">Telefone alternativo<input name="phone_alt" class="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal"><span class="field-error text-xs text-red-600"></span></label><label class="text-sm font-semibold text-slate-700">País<input name="address_country" value="MZ" class="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal"><span class="field-error text-xs text-red-600"></span></label><label class="text-sm font-semibold text-slate-700">Província/cidade <span class="text-red-600" aria-hidden="true">*</span><input required name="address_province" maxlength="160" class="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal"><span class="field-error text-xs text-red-600"></span></label><label class="sm:col-span-2 text-sm font-semibold text-slate-700">Rua / avenida<input name="address_street" class="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal"><span class="field-error text-xs text-red-600"></span></label><label class="text-sm font-semibold text-slate-700">Bairro<input name="address_neighborhood" class="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal"><span class="field-error text-xs text-red-600"></span></label><label class="text-sm font-semibold text-slate-700">Número<input name="address_house_number" class="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal"><span class="field-error text-xs text-red-600"></span></label><label class="sm:col-span-2 text-sm font-semibold text-slate-700">Endereço da empresa <span class="text-red-600" aria-hidden="true">*</span><span class="mt-1.5 flex"><input name="subdomain" spellcheck="false" class="min-w-0 flex-1 rounded-l-lg border border-slate-300 px-3 py-2.5 font-normal"><span id="subdomain-suffix" class="rounded-r-lg border border-l-0 border-slate-300 bg-slate-50 px-3 py-2.5 text-slate-600">.sizotech.net</span></span><span id="subdomain-availability" class="mt-1 block text-xs"></span><span class="field-error text-xs text-red-600"></span></label></div>
       <div data-step="3" class="signup-step hidden grid gap-4"><div id="signup-plan-summary" class="rounded-xl bg-brand-soft px-4 py-3 text-sm text-slate-700" aria-label="Plano escolhido, obrigatório"></div><label class="text-sm font-semibold text-slate-700">Área de atividade<input name="business_area" class="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal"></label><label class="text-sm font-semibold text-slate-700">Ciclo de faturação<select name="billing_cycle" class="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal"></select></label></div>
       <p id="signup-message" class="hidden mt-5 rounded-lg px-4 py-3 text-sm"></p><div class="mt-7 flex justify-between gap-3"><button type="button" id="signup-back" class="hidden rounded-lg px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-100">Voltar</button><span id="signup-spacer"></span><button type="button" id="signup-next" class="rounded-lg bg-slate-950 px-5 py-3 text-sm font-semibold text-white">Continuar</button><button type="submit" id="signup-submit" class="hidden rounded-lg bg-slate-950 px-5 py-3 text-sm font-semibold text-white">Concluir cadastro</button></div>
     </form>
   </div>
+</div>
+
+<div id="signup-progress-modal" class="signup-modal fixed inset-0 z-[80] overflow-y-auto bg-slate-950/50 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="signup-progress-title">
+  <div class="mx-auto my-10 w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl sm:p-8"><h2 id="signup-progress-title" class="text-xl font-bold text-slate-950">A preparar a sua subscrição</h2><p id="signup-progress-message" class="mt-2 text-sm text-slate-600">A validar os dados…</p><ol id="signup-progress-steps" class="mt-7 space-y-3 text-sm text-slate-500"><li data-stage="0">○ A validar os dados</li><li data-stage="1">○ A verificar o endereço da empresa</li><li data-stage="2">○ A comunicar com o servidor</li><li data-stage="3">○ A configurar o acesso</li><li data-stage="4">○ A activar a subscrição</li><li data-stage="5">○ A preparar a facturação</li><li data-stage="6">○ A concluir</li></ol><div id="signup-progress-result" class="hidden mt-7 rounded-xl px-4 py-4 text-sm"></div></div>
 </div>
 
 <footer class="border-t border-slate-200 bg-slate-50">

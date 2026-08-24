@@ -37,7 +37,7 @@
 
   var signupModal = document.getElementById('signup-modal');
   var signupForm = document.getElementById('signup-form');
-  if (signupModal && signupForm) {
+  if (false && signupModal && signupForm) {
     var step = 1;
     var resetSignup = function () {
       signupForm.reset();
