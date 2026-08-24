@@ -19,7 +19,7 @@ require __DIR__ . '/includes/head.php';
 
 <header id="site-nav" class="site-nav fixed top-0 left-0 right-0 z-50 w-full">
   <div class="relative flex w-full items-center justify-between gap-4 px-4 py-3.5 sm:px-6 lg:px-8 xl:px-10">
-    <a href="#inicio" class="flex shrink-0 items-center" aria-label="Sizo Software - início"><img src="assets/img/logo.png" alt="Sizo Software" class="h-8 w-auto object-contain sm:h-9" width="180" height="40"></a>
+    <a href="#inicio" class="flex shrink-0 items-center" aria-label="Sizo Software - início"><img src="assets/img/LOGO%20Sizotech.png" alt="Sizo Tech — Smart IT Solutions" class="h-10 w-auto object-contain sm:h-12" width="180" height="101"></a>
     <nav class="absolute left-1/2 hidden -translate-x-1/2 items-center gap-8 md:flex" aria-label="Principal">
       <a href="#sobre" class="text-sm font-medium text-slate-600 transition hover:text-slate-900">Sobre</a>
       <a href="#funcionalidades" class="text-sm font-medium text-slate-600 transition hover:text-slate-900">Funcionalidades</a>
@@ -79,7 +79,13 @@ require __DIR__ . '/includes/head.php';
 
   <section id="planos" class="section-band section-band--white scroll-mt-24 py-20 sm:py-28">
     <div class="mx-auto max-w-6xl px-5 sm:px-8">
-      <div class="mx-auto max-w-2xl text-center" data-aos="fade-up"><p class="text-sm font-semibold uppercase tracking-[0.18em] text-brand">Planos</p><h2 class="mt-3 text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">Escolha o plano ideal para si</h2><p class="mt-4 text-base leading-relaxed text-slate-600">Todos os planos incluem o sistema completo. Escolha de acordo com o ritmo da sua empresa.</p></div>
+      <div class="mx-auto max-w-2xl text-center" data-aos="fade-up"><p class="text-sm font-semibold uppercase tracking-[0.18em] text-brand">Planos</p><h2 class="mt-3 text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">Escolha o plano ideal para si</h2><p class="mt-4 text-base leading-relaxed text-slate-600">Todos os planos incluem o sistema completo. Escolha de acordo com o ritmo da sua empresa.</p><button type="button" id="choose-free-plan" disabled class="mt-6 inline-flex items-center justify-center rounded-lg border border-emerald-200 bg-transparent px-5 py-3 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-200 hover:text-emerald-950 disabled:cursor-wait disabled:opacity-60">Inicie agora - é grátis</button></div>
+      <div id="billing-cycle-picker" class="mx-auto mt-8 flex w-fit max-w-full flex-wrap justify-center gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1.5" aria-label="Periodicidade de faturação">
+        <button type="button" data-billing-cycle="monthly" aria-pressed="true" class="rounded-lg bg-slate-950 px-4 py-2 text-sm font-semibold text-white shadow-sm">Mensal</button>
+        <button type="button" data-billing-cycle="quarterly" aria-pressed="false" class="rounded-lg px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-white hover:text-slate-950">Trimestral</button>
+        <button type="button" data-billing-cycle="semiannual" aria-pressed="false" class="rounded-lg px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-white hover:text-slate-950">Semestral</button>
+        <button type="button" data-billing-cycle="yearly" aria-pressed="false" class="rounded-lg px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-white hover:text-slate-950">Anual</button>
+      </div>
       <p id="plans-loading" class="mx-auto mt-10 max-w-xl text-center text-sm text-slate-500">A carregar planos…</p>
       <p id="plans-error" class="hidden mx-auto mt-10 max-w-xl rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 text-center text-sm text-amber-800"></p>
       <div id="plans-list" class="mt-14 grid gap-5 md:grid-cols-3"></div>
@@ -111,7 +117,7 @@ require __DIR__ . '/includes/head.php';
 
 <footer class="border-t border-slate-200 bg-slate-50">
   <div class="w-full px-5 py-14 sm:px-8 lg:px-10 xl:px-12"><div class="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
-    <div class="sm:col-span-2 lg:col-span-1"><img src="assets/img/logo.png" alt="Sizo Software" class="h-8 w-auto object-contain" width="160" height="36"></div>
+    <div class="sm:col-span-2 lg:col-span-1"><img src="assets/img/LOGO%20Sizotech.png" alt="Sizo Tech — Smart IT Solutions" class="h-14 w-auto object-contain" width="180" height="101"></div>
     <div><h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">Produto</h3><ul class="mt-4 space-y-2.5 text-sm text-slate-600"><li><a href="#sobre" class="transition hover:text-slate-900">Sobre</a></li><li><a href="#funcionalidades" class="transition hover:text-slate-900">Funcionalidades</a></li><li><a href="#planos" class="transition hover:text-slate-900">Planos</a></li></ul></div>
     <div><h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">Legal</h3><ul class="mt-4 space-y-2.5 text-sm text-slate-600"><li><a href="#" class="transition hover:text-slate-900">Política de Privacidade</a></li><li><a href="#" class="transition hover:text-slate-900">Termos</a></li></ul></div>
     <div><h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">Contacto</h3><ul class="mt-4 space-y-2.5 text-sm text-slate-600"><li><a href="<?= htmlspecialchars($sizoMailtoBase, ENT_QUOTES, 'UTF-8') ?>" class="transition hover:text-slate-900"><?= htmlspecialchars($sizoContacto['email'], ENT_QUOTES, 'UTF-8') ?></a></li><li><a href="<?= htmlspecialchars($sizoWhatsAppUrl, ENT_QUOTES, 'UTF-8') ?>" class="transition hover:text-slate-900" target="_blank" rel="noopener noreferrer"><?= htmlspecialchars($sizoContacto['telefone_display'], ENT_QUOTES, 'UTF-8') ?></a></li></ul></div>
