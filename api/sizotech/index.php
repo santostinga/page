@@ -84,7 +84,7 @@ try {
         if (!is_array($input)) {
             sizo_api_reply(400, ['status' => 'invalid_request', 'message' => 'Dados inválidos.']);
         }
-        $fields = ['name', 'company_type', 'company_type_other', 'show_legal_designation', 'email', 'nuit', 'phone', 'phone_alt', 'business_area', 'address_country', 'address_province', 'address_street', 'address_neighborhood', 'address_house_number', 'plan_code', 'billing_cycle', 'subdomain'];
+        $fields = ['name', 'company_type', 'company_type_other', 'show_legal_designation', 'email', 'nuit', 'phone', 'phone_alt', 'business_area', 'business_area_other', 'address_country', 'address_province', 'address_street', 'address_neighborhood', 'address_house_number', 'plan_code', 'billing_cycle', 'subdomain'];
         $payload = [];
         foreach ($fields as $field) {
             $payload[$field] = is_bool($input[$field] ?? null) ? $input[$field] : trim((string) ($input[$field] ?? ''));
