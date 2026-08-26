@@ -1,0 +1,18 @@
+diff --git a/app/Services/IntegrationAuth.php b/app/Services/IntegrationAuth.php
+--- a/app/Services/IntegrationAuth.php
++++ b/app/Services/IntegrationAuth.php
+@@ -32,5 +32,13 @@ final class IntegrationAuth
+ 
+     public static function authenticate(): ?string
+     {
+-        $header = trim((string) ($_SERVER['HTTP_AUTHORIZATION'] ?? ''));
++        $header = trim((string) ($_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? ''));
++        if ($header === '' && function_exists('getallheaders')) {
++            foreach (getallheaders() as $name => $value) {
++                if (strcasecmp((string) $name, 'Authorization') === 0) {
++                    $header = trim((string) $value);
++                    break;
++                }
++            }
++        }
+         if (preg_match('/^Bearer\s+(.+)$/i', $header, $m) !== 1) {
