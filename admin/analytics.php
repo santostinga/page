@@ -66,7 +66,7 @@ $periods = ['today' => 'Hoje', '7d' => '7 dias', '30d' => '30 dias'];
 
     <?php if (empty($stats['ok'])): ?>
       <div class="mt-8 rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900">
-        Não foi possível carregar estatísticas. Verifique a ligação à base de dados no servidor.
+        Não foi possível carregar estatísticas. Verifique se a pasta <code class="rounded bg-slate-100 px-1">storage/</code> tem permissão de escrita no servidor.
       </div>
     <?php else: ?>
       <div class="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

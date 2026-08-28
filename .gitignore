@@ -19,3 +19,7 @@ Desktop.ini
 
 # Logs
 *.log
+
+# Analytics (ficheiro SQLite local — não versionar)
+/storage/*.sqlite
+/storage/*.sqlite-*

@@ -1,6 +1,5 @@
 <?php
 require_once __DIR__ . '/env.php';
-require_once __DIR__ . '/companies.php';
 
 function sizo_analytics_enabled(): bool
 {
@@ -12,9 +11,59 @@ function sizo_analytics_token(): string
     return (string) sizo_env('ANALYTICS_TOKEN', '');
 }
 
+function sizo_analytics_storage_path(): string
+{
+    $configured = trim((string) sizo_env('ANALYTICS_STORAGE_PATH', ''));
+    if ($configured !== '') {
+        if (!preg_match('#^([a-zA-Z]:[\\\\/]|/)#', $configured)) {
+            $configured = dirname(__DIR__) . DIRECTORY_SEPARATOR . $configured;
+        }
+
+        return $configured;
+    }
+
+    return dirname(__DIR__) . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'analytics.sqlite';
+}
+
+function sizo_analytics_db(): ?PDO
+{
+    static $pdo = null;
+    static $tried = false;
+    if ($tried) {
+        return $pdo;
+    }
+    $tried = true;
+
+    if (!extension_loaded('pdo_sqlite')) {
+        error_log('[sizo-page] PDO SQLite extension is not available.');
+        return null;
+    }
+
+    $path = sizo_analytics_storage_path();
+    $dir = dirname($path);
+    if (!is_dir($dir) && !mkdir($dir, 0755, true) && !is_dir($dir)) {
+        error_log('[sizo-page] Analytics storage directory is not writable: ' . $dir);
+        return null;
+    }
+
+    try {
+        $pdo = new PDO('sqlite:' . $path, null, null, [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        ]);
+        $pdo->exec('PRAGMA journal_mode = WAL;');
+        $pdo->exec('PRAGMA synchronous = NORMAL;');
+    } catch (Throwable $e) {
+        $pdo = null;
+        error_log('[sizo-page] Analytics SQLite failed: ' . $e->getMessage());
+    }
+
+    return $pdo;
+}
+
 function sizo_analytics_ensure_schema(?PDO $db = null): bool
 {
-    $db = $db ?? sizo_db();
+    $db = $db ?? sizo_analytics_db();
     if (!$db) {
         return false;
     }
@@ -26,32 +75,32 @@ function sizo_analytics_ensure_schema(?PDO $db = null): bool
 
     $db->exec(
         'CREATE TABLE IF NOT EXISTS page_analytics_events (
-            id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-            event_type VARCHAR(32) NOT NULL,
-            page_path VARCHAR(500) NOT NULL,
-            page_title VARCHAR(255) NULL,
-            element_label VARCHAR(255) NULL,
-            element_href VARCHAR(500) NULL,
-            section_id VARCHAR(64) NULL,
-            referrer VARCHAR(500) NULL,
-            referrer_domain VARCHAR(255) NULL,
-            utm_source VARCHAR(100) NULL,
-            utm_medium VARCHAR(100) NULL,
-            utm_campaign VARCHAR(100) NULL,
-            country_code CHAR(2) NULL,
-            device_type VARCHAR(20) NULL,
-            browser VARCHAR(50) NULL,
-            session_id CHAR(36) NOT NULL,
-            visitor_hash CHAR(64) NOT NULL,
-            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            INDEX idx_created (created_at),
-            INDEX idx_type_created (event_type, created_at),
-            INDEX idx_page_created (page_path(191), created_at),
-            INDEX idx_referrer_created (referrer_domain, created_at),
-            INDEX idx_session (session_id),
-            INDEX idx_visitor_created (visitor_hash, created_at)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            event_type TEXT NOT NULL,
+            page_path TEXT NOT NULL,
+            page_title TEXT NULL,
+            element_label TEXT NULL,
+            element_href TEXT NULL,
+            section_id TEXT NULL,
+            referrer TEXT NULL,
+            referrer_domain TEXT NULL,
+            utm_source TEXT NULL,
+            utm_medium TEXT NULL,
+            utm_campaign TEXT NULL,
+            country_code TEXT NULL,
+            device_type TEXT NULL,
+            browser TEXT NULL,
+            session_id TEXT NOT NULL,
+            visitor_hash TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )'
     );
+    $db->exec('CREATE INDEX IF NOT EXISTS idx_created ON page_analytics_events (created_at)');
+    $db->exec('CREATE INDEX IF NOT EXISTS idx_type_created ON page_analytics_events (event_type, created_at)');
+    $db->exec('CREATE INDEX IF NOT EXISTS idx_page_created ON page_analytics_events (page_path, created_at)');
+    $db->exec('CREATE INDEX IF NOT EXISTS idx_referrer_created ON page_analytics_events (referrer_domain, created_at)');
+    $db->exec('CREATE INDEX IF NOT EXISTS idx_session ON page_analytics_events (session_id)');
+    $db->exec('CREATE INDEX IF NOT EXISTS idx_visitor_created ON page_analytics_events (visitor_hash, created_at)');
 
     $ready = true;
 
@@ -174,9 +223,9 @@ function sizo_analytics_store_events(array $events): array
         return ['ok' => false, 'stored' => 0, 'message' => 'Analytics disabled'];
     }
 
-    $db = sizo_db();
+    $db = sizo_analytics_db();
     if (!$db || !sizo_analytics_ensure_schema($db)) {
-        return ['ok' => false, 'stored' => 0, 'message' => 'Database unavailable'];
+        return ['ok' => false, 'stored' => 0, 'message' => 'Storage unavailable'];
     }
 
     $userAgent = (string) ($_SERVER['HTTP_USER_AGENT'] ?? '');
@@ -251,9 +300,9 @@ function sizo_analytics_store_events(array $events): array
 
 function sizo_analytics_stats(string $period = 'today'): array
 {
-    $db = sizo_db();
+    $db = sizo_analytics_db();
     if (!$db || !sizo_analytics_ensure_schema($db)) {
-        return ['ok' => false, 'message' => 'Database unavailable'];
+        return ['ok' => false, 'message' => 'Storage unavailable'];
     }
 
     [$from, $to, $label] = sizo_analytics_period_bounds($period);

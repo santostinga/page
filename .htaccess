@@ -29,4 +29,7 @@
 
   RewriteRule ^api/sizotech/(.*)$ api/sizotech/index.php?route=$1 [QSA,L]
   RewriteRule ^api/analytics/(.*)$ api/analytics/index.php?route=$1 [QSA,L]
+
+  # Bloquear acesso directo ao ficheiro de analytics
+  RewriteRule ^storage/ - [F,L]
 </IfModule>
