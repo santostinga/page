@@ -2,6 +2,9 @@
 /**
  * Serve o logótipo de uma empresa a partir de COMPANY_UPLOADS_PATH.
  */
+require_once __DIR__ . '/config/https.php';
+sizo_force_canonical_https();
+
 require_once __DIR__ . '/config/env.php';
 
 $id = isset($_GET['id']) ? (int) $_GET['id'] : 0;

@@ -2,6 +2,9 @@
 
 declare(strict_types=1);
 
+require_once dirname(__DIR__, 2) . '/config/https.php';
+sizo_force_canonical_https();
+
 session_start();
 require_once dirname(__DIR__, 2) . '/config/SizotechApiClient.php';
 

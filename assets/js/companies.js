@@ -20,8 +20,12 @@
       fallback.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-4M9 9h.01M9 13h.01M9 17h.01"/>';
       logo.appendChild(fallback);
       if (company.logo_url) {
+        var logoUrl = String(company.logo_url);
+        if (logoUrl.indexOf('http://') === 0) {
+          logoUrl = 'https://' + logoUrl.slice(7);
+        }
         var image = document.createElement('img');
-        image.src = company.logo_url; image.alt = 'Logótipo da ' + (company.name || 'empresa'); image.loading = 'lazy'; image.className = 'h-full w-full object-contain';
+        image.src = logoUrl; image.alt = 'Logótipo da ' + (company.name || 'empresa'); image.loading = 'lazy'; image.className = 'h-full w-full object-contain';
         image.addEventListener('load', function () { fallback.classList.add('hidden'); });
         image.addEventListener('error', function () { image.remove(); });
         logo.appendChild(image);

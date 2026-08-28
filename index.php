@@ -1,4 +1,7 @@
 <?php
+require_once __DIR__ . '/config/https.php';
+sizo_force_canonical_https();
+
 session_start();
 if (!headers_sent()) {
     header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');

@@ -1,4 +1,7 @@
 <?php
+require_once __DIR__ . '/config/https.php';
+sizo_force_canonical_https();
+
 session_start();
 require_once __DIR__ . '/config/system_api.php';
 

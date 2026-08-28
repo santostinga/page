@@ -1,14 +1,23 @@
 <?php
+require_once __DIR__ . '/../config/https.php';
+
 $pageTitle = $pageTitle ?? 'Sizo Software | Gestão e Facturação Empresarial';
 $pageDesc = $pageDesc ?? 'ERP cloud para vendas, inventário, clientes, caixa, documentos fiscais e relatórios numa única plataforma.';
+$canonicalUrl = sizo_canonical_url();
 ?>
 <!DOCTYPE html>
 <html lang="pt">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
   <meta name="description" content="<?= htmlspecialchars($pageDesc, ENT_QUOTES, 'UTF-8') ?>">
   <title><?= htmlspecialchars($pageTitle, ENT_QUOTES, 'UTF-8') ?></title>
+  <link rel="canonical" href="<?= htmlspecialchars($canonicalUrl, ENT_QUOTES, 'UTF-8') ?>">
+  <meta property="og:url" content="<?= htmlspecialchars($canonicalUrl, ENT_QUOTES, 'UTF-8') ?>">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="<?= htmlspecialchars($pageTitle, ENT_QUOTES, 'UTF-8') ?>">
+  <meta property="og:description" content="<?= htmlspecialchars($pageDesc, ENT_QUOTES, 'UTF-8') ?>">
   <link rel="icon" type="image/png" sizes="256x256" href="assets/img/favicon-transparent.png?v=3">
   <link rel="shortcut icon" type="image/png" href="assets/img/favicon-transparent.png?v=3">
   <link rel="apple-touch-icon" sizes="256x256" href="assets/img/favicon-transparent.png?v=3">
