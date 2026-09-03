@@ -68,7 +68,7 @@
       Object.keys(fieldSteps).forEach(function (name) { if (fieldSteps[name] === currentStep) clearFieldError(name); });
       if (currentStep === 1) { if (value('name').replace(/[^\p{L}\p{N}]/gu, '').length < 2) add('name', 'Indique um nome de empresa válido.'); if (!value('company_type')) add('company_type', 'Seleccione o tipo jurídico.'); if (value('company_type') === 'OTHER' && !value('company_type_other')) add('company_type_other', 'Indique o tipo jurídico.'); if (value('email') === '' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value('email'))) add('email', 'Indique um e-mail válido.'); if (!value('nuit')) add('nuit', 'Indique o NUIT da empresa.'); else if (!/^\d{9}$/.test(value('nuit'))) add('nuit', 'Indique um NUIT válido com 9 dígitos.'); }
       if (currentStep === 2) { if (!value('address_province')) add('address_province', 'Indique a província ou cidade.'); ['phone','phone_alt'].forEach(function (name) { var phone = value(name); if (phone && !/^(?:\+258)?0?8\d{8}$/.test(phone.replace(/[\s-]/g, ''))) add(name, 'Indique um telefone válido.'); }); }
-      if (currentStep === 3) { if (!value('plan_code')) add('plan_code', 'Seleccione um plano válido.'); if (!value('billing_cycle')) add('billing_cycle', 'Seleccione o ciclo de faturação.'); if (value('business_area').length > 160) add('business_area', 'A área de actividade é demasiado longa.'); }
+      if (currentStep === 3) { if (!value('plan_code')) add('plan_code', 'Seleccione um plano válido.'); if (String(value('plan_code')).toUpperCase() !== 'FREE' && !value('billing_cycle')) add('billing_cycle', 'Seleccione o ciclo de faturação.'); if (value('business_area').length > 160) add('business_area', 'A área de actividade é demasiado longa.'); }
       return errors;
     };
     var showApiErrors = function (errors) {
@@ -101,6 +101,10 @@
       document.getElementById('signup-plan-summary').textContent = 'Plano escolhido *: ' + button.dataset.planName + ' — ' + button.dataset.planPrice;
       var cycle = signupForm.elements.billing_cycle; cycle.innerHTML = '';
       JSON.parse(button.dataset.planCycles || '["monthly"]').forEach(function (item) { var option = new Option(item.charAt(0).toUpperCase() + item.slice(1), item); cycle.add(option); });
+      var isFree = String(button.dataset.planCode || '').toUpperCase() === 'FREE';
+      var cycleWrap = document.getElementById('signup-billing-cycle-wrap');
+      if (cycleWrap) cycleWrap.classList.toggle('hidden', isFree);
+      if (isFree) cycle.value = 'monthly';
       signupModal.classList.add('is-open'); document.body.classList.add('modal-open');
     }); });
     document.querySelectorAll('[data-signup-close]').forEach(function (button) { button.addEventListener('click', function () { signupModal.classList.remove('is-open'); document.body.classList.remove('modal-open'); resetSignup(); }); });

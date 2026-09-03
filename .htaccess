@@ -18,11 +18,13 @@
 <IfModule mod_rewrite.c>
   RewriteEngine On
 
-  # Domínio canónico: sizotech.net -> www.sizotech.net (HTTP e HTTPS)
+  # Apenas produção: sizotech.net -> www.sizotech.net (HTTP e HTTPS).
+  # Não aplicar a page.local / Laragon para evitar ERR_SSL_PROTOCOL_ERROR.
   RewriteCond %{HTTP_HOST} ^sizotech\.net$ [NC]
   RewriteRule ^ https://www.sizotech.net%{REQUEST_URI} [L,R=301]
 
-  # Forçar HTTPS (compatível com Cloudways e Cloudflare)
+  # Forçar HTTPS só no domínio público (Cloudways / Cloudflare).
+  RewriteCond %{HTTP_HOST} ^(www\.)?sizotech\.net$ [NC]
   RewriteCond %{HTTPS} !=on
   RewriteCond %{HTTP:X-Forwarded-Proto} !https [NC]
   RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]

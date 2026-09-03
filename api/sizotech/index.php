@@ -75,6 +75,53 @@ try {
         $result = $client->request('GET', '/provisionings/' . $id);
         sizo_api_reply($result['status'], $result['body']);
     }
+    if ($method === 'POST' && $route === 'registrations/validate') {
+        if (!sizo_api_csrf_valid()) {
+            sizo_api_reply(403, ['status' => 'invalid_request', 'message' => 'Pedido inválido. Atualize a página e tente novamente.']);
+        }
+        $input = json_decode((string) file_get_contents('php://input'), true);
+        if (!is_array($input)) {
+            sizo_api_reply(400, ['status' => 'invalid_request', 'message' => 'Dados inválidos.']);
+        }
+        $fields = ['name', 'company_type', 'company_type_other', 'show_legal_designation', 'email', 'nuit', 'phone', 'phone_alt', 'business_area', 'business_area_other', 'address_country', 'address_province', 'address_street', 'address_neighborhood', 'address_house_number', 'plan_code', 'billing_cycle', 'subdomain'];
+        $payload = ['step' => (int) ($input['step'] ?? 0)];
+        foreach ($fields as $field) {
+            $payload[$field] = is_bool($input[$field] ?? null) ? $input[$field] : trim((string) ($input[$field] ?? ''));
+        }
+        $payload['show_legal_designation'] = !empty($input['show_legal_designation']);
+        $result = $client->request('POST', '/registrations/validate', $payload);
+        sizo_api_reply($result['status'], $result['body']);
+    }
+    if ($method === 'POST' && $route === 'registrations/email-code/send') {
+        if (!sizo_api_csrf_valid()) {
+            sizo_api_reply(403, ['status' => 'invalid_request', 'message' => 'Pedido inválido. Atualize a página e tente novamente.']);
+        }
+        $input = json_decode((string) file_get_contents('php://input'), true);
+        if (!is_array($input)) {
+            sizo_api_reply(400, ['status' => 'invalid_request', 'message' => 'Dados inválidos.']);
+        }
+        $payload = [
+            'email' => trim((string) ($input['email'] ?? '')),
+            'name' => trim((string) ($input['name'] ?? '')),
+        ];
+        $result = $client->request('POST', '/registrations/email-code/send', $payload);
+        sizo_api_reply($result['status'], $result['body']);
+    }
+    if ($method === 'POST' && $route === 'registrations/email-code/verify') {
+        if (!sizo_api_csrf_valid()) {
+            sizo_api_reply(403, ['status' => 'invalid_request', 'message' => 'Pedido inválido. Atualize a página e tente novamente.']);
+        }
+        $input = json_decode((string) file_get_contents('php://input'), true);
+        if (!is_array($input)) {
+            sizo_api_reply(400, ['status' => 'invalid_request', 'message' => 'Dados inválidos.']);
+        }
+        $payload = [
+            'email' => trim((string) ($input['email'] ?? '')),
+            'code' => trim((string) ($input['code'] ?? '')),
+        ];
+        $result = $client->request('POST', '/registrations/email-code/verify', $payload);
+        sizo_api_reply($result['status'], $result['body']);
+    }
     if ($method === 'POST' && $route === 'registrations') {
         if (!sizo_api_csrf_valid()) {
             sizo_api_reply(403, ['status' => 'invalid_request', 'message' => 'Pedido inválido. Atualize a página e tente novamente.']);
@@ -87,7 +134,7 @@ try {
         if (!is_array($input)) {
             sizo_api_reply(400, ['status' => 'invalid_request', 'message' => 'Dados inválidos.']);
         }
-        $fields = ['name', 'company_type', 'company_type_other', 'show_legal_designation', 'email', 'nuit', 'phone', 'phone_alt', 'business_area', 'business_area_other', 'address_country', 'address_province', 'address_street', 'address_neighborhood', 'address_house_number', 'plan_code', 'billing_cycle', 'subdomain'];
+        $fields = ['name', 'company_type', 'company_type_other', 'show_legal_designation', 'email', 'nuit', 'phone', 'phone_alt', 'business_area', 'business_area_other', 'address_country', 'address_province', 'address_street', 'address_neighborhood', 'address_house_number', 'plan_code', 'billing_cycle', 'subdomain', 'email_verification_token'];
         $payload = [];
         foreach ($fields as $field) {
             $payload[$field] = is_bool($input[$field] ?? null) ? $input[$field] : trim((string) ($input[$field] ?? ''));

@@ -5,13 +5,16 @@
   var form = document.getElementById('signup-form');
   var modal = document.getElementById('signup-modal');
   var progressModal = document.getElementById('signup-progress-modal');
-  if (!form || !modal || !progressModal) return;
+  var verificationModal = document.getElementById('email-verification-modal');
+  var verificationForm = document.getElementById('email-verification-form');
+  if (!form || !modal || !progressModal || !verificationModal || !verificationForm) return;
   form.elements.company_type.closest('label').classList.add('sm:col-span-2');
   form.elements.email.closest('label').classList.remove('sm:col-span-2');
   form.elements.nuit.maxLength = 11;
   form.elements.nuit.setAttribute('data-mz-nuit', '');
 
   var currentStep = 1;
+  var totalSteps = 3;
   var loadedPlans = [];
   var plansPromise = null;
   var selectedBillingCycle = 'monthly';
@@ -19,6 +22,16 @@
   var suggestTimer = null;
   var checkTimer = null;
   var submitting = false;
+  var idempotencyRetry = false;
+  var monitorTimer = null;
+  var emailVerificationToken = '';
+  var emailVerifiedFor = '';
+  var emailCodeSentFor = '';
+  var emailVerificationPending = false;
+  var resendCooldownTimer = null;
+  var pickerModal = document.getElementById('plan-picker-modal');
+  var otpInputs = Array.prototype.slice.call(verificationModal.querySelectorAll('.otp-input'));
+  var confirmButton = document.getElementById('confirmButton');
   var fieldSteps = { name: 1, company_type: 1, company_type_other: 1, email: 1, nuit: 1, subdomain: 1, phone: 2, phone_alt: 2, address_country: 2, address_province: 2, address_street: 2, address_neighborhood: 2, address_house_number: 2, business_area: 3, business_area_other: 3, plan_code: 3, billing_cycle: 3 };
   var billingCycles = {
     monthly: { label: 'Mensal', period: '/mês', months: 1 },
@@ -67,7 +80,7 @@
   function setupSearchableSelect(select, placeholder) {
     var source = Array.prototype.map.call(select.options, function (option) { return { value: option.value, label: option.textContent.trim(), selected: option.selected, disabled: option.disabled, requiresOther: option.dataset.requiresOther || '', designation: option.dataset.designation || '' }; });
     var wrap = document.createElement('div'); wrap.className = 'relative mt-1.5';
-    var input = document.createElement('input'); input.type = 'search'; input.placeholder = placeholder; input.autocomplete = 'off'; input.dataset.selectSearch = select.name; input.className = select.className.replace('mt-1.5', ''); input.setAttribute('role', 'combobox'); input.setAttribute('aria-expanded', 'false');
+    var input = document.createElement('input'); input.type = 'text'; input.placeholder = placeholder; input.autocomplete = 'off'; input.dataset.selectSearch = select.name; input.className = select.className.replace('mt-1.5', ''); input.setAttribute('role', 'combobox'); input.setAttribute('aria-expanded', 'false');
     var menu = document.createElement('div'); menu.className = 'absolute z-50 mt-1 hidden max-h-56 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white p-1 shadow-xl'; menu.setAttribute('role', 'listbox');
     wrap.appendChild(input); wrap.appendChild(menu); select.insertAdjacentElement('beforebegin', wrap); select.classList.add('hidden'); select.tabIndex = -1; select._searchInput = input; select._searchOptions = source;
     var closeMenu = function () { menu.classList.add('hidden'); input.setAttribute('aria-expanded', 'false'); };
@@ -80,23 +93,132 @@
       menu.classList.remove('hidden'); input.setAttribute('aria-expanded', 'true');
     };
     select._renderSearchOptions = function (term, useDefault) { if (useDefault) select.value = ((source.filter(function (item) { return item.selected; })[0] || {}).value || ''); var current = source.filter(function (item) { return item.value === select.value; })[0]; input.value = current ? current.label : ''; if (term) renderMenu(term); else closeMenu(); };
-    input.addEventListener('focus', function () { if (select.value === '') input.value = ''; renderMenu(''); });
+    input.addEventListener('focus', function () { if (select.value === '') input.value = ''; });
+    input.addEventListener('click', function () { renderMenu(input.value); });
     input.addEventListener('input', function () { renderMenu(input.value); clearError(select.name); updateNavigationState(); });
-    input.addEventListener('keydown', function (event) { if (event.key === 'Enter') { var first = menu.querySelector('button'); if (first) { event.preventDefault(); event.stopPropagation(); first.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })); } } else if (event.key === 'Escape') { closeMenu(); } });
+    input.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape') { closeMenu(); return; }
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); renderMenu(input.value); }
+    });
     input.addEventListener('blur', function () { setTimeout(function () { var current = source.filter(function (item) { return item.value === select.value; })[0]; input.value = current ? current.label : ''; closeMenu(); updateNavigationState(); }, 100); });
     select._renderSearchOptions('', false);
     return input;
   }
   function syncSearchableSelect(select, useDefault) { if (select && select._searchInput) { select._searchInput.value = ''; select._renderSearchOptions('', !!useDefault); } }
   function searchableSelectionValid(select) {
-    if (!select) return false;
-    var option = select.options[select.selectedIndex];
-    if (!option || !select.value) return false;
+    if (!select || !select.value) return false;
     if (!select._searchInput) return true;
-    return select._searchInput.value.trim() === option.textContent.trim();
+    var typed = select._searchInput.value.trim();
+    var current = (select._searchOptions || []).filter(function (item) { return item.value === select.value; })[0];
+    if (!typed) {
+      if (current) select._searchInput.value = current.label;
+      return !!current;
+    }
+    if (current && typed.toLocaleLowerCase('pt') === current.label.toLocaleLowerCase('pt')) return true;
+    return (select._searchOptions || []).some(function (item) {
+      return !item.disabled && item.label.toLocaleLowerCase('pt') === typed.toLocaleLowerCase('pt');
+    });
   }
   function currentCsrf() {
     return (form.elements.csrf && form.elements.csrf.value) || '';
+  }
+  var modalCloseTimer = null;
+  function hideModalInstant(el) {
+    if (!el) return;
+    el.classList.remove('is-open', 'is-closing');
+    el.classList.add('hidden');
+  }
+  function closeModalAnimated(el, onDone) {
+    if (!el || el.classList.contains('hidden')) {
+      if (onDone) onDone();
+      return;
+    }
+    if (!el.classList.contains('is-open') && !el.classList.contains('is-closing')) {
+      el.classList.add('hidden');
+      if (onDone) onDone();
+      return;
+    }
+    el.classList.remove('is-open');
+    el.classList.add('is-closing');
+    var done = false;
+    var finish = function () {
+      if (done) return;
+      done = true;
+      el.classList.remove('is-closing');
+      el.classList.add('hidden');
+      if (onDone) onDone();
+    };
+    var onEnd = function (event) {
+      if (event.target !== el) return;
+      el.removeEventListener('transitionend', onEnd);
+      finish();
+    };
+    el.addEventListener('transitionend', onEnd);
+    setTimeout(finish, 340);
+  }
+  function closeAllModals(options) {
+    var animate = !!(options && options.animate);
+    var onDone = options && options.onDone;
+    if (monitorTimer) {
+      clearTimeout(monitorTimer);
+      monitorTimer = null;
+    }
+    if (typeof clearProgressTimer === 'function') clearProgressTimer();
+    if (modalCloseTimer) {
+      clearTimeout(modalCloseTimer);
+      modalCloseTimer = null;
+    }
+    var list = [pickerModal, modal, verificationModal, progressModal].filter(Boolean);
+    if (!animate) {
+      list.forEach(hideModalInstant);
+      document.body.classList.remove('modal-open');
+      if (onDone) onDone();
+      return;
+    }
+    var pending = list.filter(function (el) {
+      return el.classList.contains('is-open') || el.classList.contains('is-closing');
+    });
+    if (!pending.length) {
+      list.forEach(hideModalInstant);
+      document.body.classList.remove('modal-open');
+      if (onDone) onDone();
+      return;
+    }
+    var left = pending.length;
+    pending.forEach(function (el) {
+      closeModalAnimated(el, function () {
+        left -= 1;
+        if (left > 0) return;
+        document.body.classList.remove('modal-open');
+        if (onDone) onDone();
+      });
+    });
+  }
+  function openModal(target) {
+    closeAllModals();
+    if (!target) return;
+    target.classList.remove('hidden', 'is-closing');
+    void target.offsetWidth;
+    target.classList.add('is-open');
+    document.body.classList.add('modal-open');
+  }
+  function switchModal(from, to, onDone) {
+    if (!to) {
+      if (onDone) onDone();
+      return;
+    }
+    var finish = function () {
+      to.classList.remove('hidden', 'is-closing');
+      void to.offsetWidth;
+      to.classList.add('is-open');
+      document.body.classList.add('modal-open');
+      if (onDone) onDone();
+    };
+    if (!from || from.classList.contains('hidden')) {
+      finish();
+      return;
+    }
+    closeModalAnimated(from, finish);
   }
   function showSignupMessage(text, kind) {
     var message = document.getElementById('signup-message');
@@ -158,73 +280,347 @@
     }
     return key;
   }
+  function newKey() {
+    sessionStorage.removeItem('sizotech_registration_key');
+    return getKey();
+  }
+  function isIdempotencyConflict(body) {
+    var text = String((body && body.message) || '') + JSON.stringify((body && body.errors) || {});
+    return /idempot/i.test(text);
+  }
   function resetForm() {
-    form.reset(); currentStep = 1; subdomainAvailable = false; submitting = false;
+    form.reset(); currentStep = 1; subdomainAvailable = false; submitting = false; idempotencyRetry = false;
+    emailVerificationToken = ''; emailVerifiedFor = ''; emailCodeSentFor = '';
+    emailVerificationPending = false;
+    clearResendCountdown();
+    clearOtpInputs();
+    sessionStorage.removeItem('sizotech_registration_key');
     form.querySelectorAll('.field-error').forEach(function (item) { item.textContent = ''; });
     form.querySelectorAll('.border-red-300, .bg-red-50\\/30').forEach(function (field) { field.classList.remove('border-red-300', 'bg-red-50/30'); });
     showSignupMessage('', '');
     document.getElementById('subdomain-availability').textContent = '';
+    var planTotal = document.getElementById('signup-plan-total');
+    if (planTotal) planTotal.classList.add('hidden');
     syncOther(); updateAddressFields(); syncSubdomainState(); showStep(1);
+  }
+  function formApiStep(uiStep) {
+    if (uiStep === 1 || uiStep === 2 || uiStep === 3) return uiStep;
+    return 0;
+  }
+  function clearOtpInputs() {
+    otpInputs.forEach(function (input) {
+      input.value = '';
+      input.classList.remove('error');
+    });
+    var err = document.getElementById('email-verification-error');
+    if (err) {
+      err.textContent = 'O código introduzido é inválido. Verifique e tente novamente.';
+      err.classList.add('hidden');
+    }
+    updateConfirmButton();
+  }
+  function otpCode() {
+    var digits = '';
+    otpInputs.forEach(function (input) { digits += String(input.value || '').replace(/\D/g, ''); });
+    return digits.slice(0, 4);
+  }
+  function updateConfirmButton() {
+    if (!confirmButton) return;
+    confirmButton.disabled = otpCode().length !== 4 || submitting;
+  }
+  function maskEmailLocal(email) {
+    email = String(email || '').trim();
+    var at = email.indexOf('@');
+    if (at < 1) return email;
+    var local = email.slice(0, at);
+    var domain = email.slice(at + 1);
+    if (local.length <= 1) return local + '***@' + domain;
+    if (local.length === 2) return local.charAt(0) + '***' + local.charAt(1) + '@' + domain;
+    return local.charAt(0) + '***' + local.charAt(local.length - 1) + '@' + domain;
+  }
+  function clearResendCountdown() {
+    if (resendCooldownTimer) {
+      clearInterval(resendCooldownTimer);
+      resendCooldownTimer = null;
+    }
+    var countdown = document.getElementById('resendCountdown');
+    var button = document.getElementById('resendButton');
+    if (countdown) countdown.classList.add('hidden');
+    if (button) {
+      button.disabled = false;
+      button.textContent = 'Reenviar código';
+      button.classList.add('hidden');
+    }
+  }
+  function startResendCountdown(seconds) {
+    var countdown = document.getElementById('resendCountdown');
+    var button = document.getElementById('resendButton');
+    if (!countdown || !button) return;
+    clearResendCountdown();
+    var left = Math.max(1, Number(seconds) || 60);
+    button.classList.add('hidden');
+    countdown.classList.remove('hidden');
+    countdown.textContent = 'Reenviar em ' + left + 's';
+    resendCooldownTimer = setInterval(function () {
+      left -= 1;
+      if (left <= 0) {
+        clearInterval(resendCooldownTimer);
+        resendCooldownTimer = null;
+        countdown.classList.add('hidden');
+        button.classList.remove('hidden');
+        return;
+      }
+      countdown.textContent = 'Reenviar em ' + left + 's';
+    }, 1000);
+  }
+  function invalidateEmailVerification() {
+    emailVerificationToken = '';
+    emailVerifiedFor = '';
+    emailCodeSentFor = '';
+    clearOtpInputs();
+  }
+  function showVerificationError(message) {
+    var err = document.getElementById('email-verification-error');
+    if (err) {
+      err.textContent = message || 'O código introduzido é inválido. Verifique e tente novamente.';
+      err.classList.remove('hidden');
+    }
+    otpInputs.forEach(function (input) { input.classList.add('error'); });
+    if (otpInputs[0]) otpInputs[0].focus();
+  }
+  function clearVerificationError() {
+    var err = document.getElementById('email-verification-error');
+    if (err) err.classList.add('hidden');
+    otpInputs.forEach(function (input) { input.classList.remove('error'); });
+  }
+  function animateVerificationState(el) {
+    if (!el) return;
+    el.classList.remove('hidden');
+    el.classList.remove('state-enter');
+    void el.offsetWidth;
+    el.classList.add('state-enter');
+  }
+  function setEmailVerificationView(view, options) {
+    options = options || {};
+    var sending = document.getElementById('email-verification-sending');
+    var sendError = document.getElementById('email-verification-send-error');
+    var codeWrap = document.getElementById('email-verification-code');
+    var verified = document.getElementById('email-verification-verified');
+    var subtitle = document.getElementById('email-verification-subtitle');
+    var title = document.getElementById('email-verification-title');
+    var masked = options.masked || maskEmailLocal(form.elements.email.value);
+
+    [sending, sendError, codeWrap, verified].forEach(function (el) {
+      if (el) el.classList.add('hidden');
+    });
+
+    if (title) {
+      if (view === 'verified') title.textContent = 'E-mail verificado';
+      else if (view === 'error') title.textContent = 'Verificação do e-mail';
+      else title.textContent = 'Verificação do e-mail';
+    }
+
+    if (subtitle) {
+      if (view === 'sending') {
+        subtitle.classList.remove('hidden');
+        subtitle.textContent = 'Estamos a preparar a verificação do seu endereço de e-mail.';
+      } else {
+        subtitle.classList.add('hidden');
+      }
+    }
+
+    if (view === 'sending') {
+      var sendMask = document.getElementById('email-verification-sending-mask');
+      if (sendMask) sendMask.textContent = masked;
+      animateVerificationState(sending);
+      return;
+    }
+    if (view === 'error') {
+      var errText = document.getElementById('email-verification-send-error-text');
+      if (errText) {
+        errText.textContent = options.message || 'Não foi possível enviar o código de verificação. Tente novamente mais tarde.';
+      }
+      animateVerificationState(sendError);
+      return;
+    }
+    if (view === 'form') {
+      var mask = document.getElementById('maskedEmail');
+      if (mask) mask.textContent = masked;
+      animateVerificationState(codeWrap);
+      return;
+    }
+    if (view === 'verified') {
+      animateVerificationState(verified);
+    }
+  }
+  function openEmailVerificationModal(options) {
+    options = options || {};
+    var view = options.view || 'sending';
+    var masked = options.masked || maskEmailLocal(form.elements.email.value);
+    clearOtpInputs();
+    var resendMessage = document.getElementById('resendMessage');
+    if (resendMessage) resendMessage.classList.add('hidden');
+    if (confirmButton) {
+      confirmButton.innerHTML = 'Confirmar código';
+      confirmButton.disabled = true;
+    }
+    setEmailVerificationView(view, { masked: masked, message: options.message });
+    if (verificationModal.classList.contains('is-open')) {
+      if (view === 'form') {
+        setTimeout(function () {
+          if (otpInputs[0]) otpInputs[0].focus();
+        }, 80);
+      }
+      return;
+    }
+    switchModal(modal, verificationModal, function () {
+      if (view !== 'form') return;
+      setTimeout(function () {
+        if (otpInputs[0]) otpInputs[0].focus();
+      }, 180);
+    });
+  }
+  function showEmailVerificationForm(masked) {
+    setEmailVerificationView('form', { masked: masked });
+    if (!resendCooldownTimer) {
+      startResendCountdown(60);
+    }
+    setTimeout(function () {
+      if (otpInputs[0]) otpInputs[0].focus();
+    }, 150);
+  }
+  function showEmailVerificationSendError(message) {
+    setEmailVerificationView('error', { message: message });
+  }
+  function beginEmailVerificationFlow(force) {
+    var email = String(form.elements.email.value || '').trim().toLowerCase();
+    var masked = maskEmailLocal(email);
+    emailVerificationPending = true;
+    setActionBusy(true);
+    openEmailVerificationModal({ view: 'sending', masked: masked });
+
+    return request('registrations/validate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': currentCsrf() },
+      body: JSON.stringify(Object.assign({ step: 1 }, formPayload()))
+    }).then(function (r) {
+      if (!emailVerificationPending) {
+        setActionBusy(false);
+        return { ok: false, cancelled: true };
+      }
+      var body = r.body || {};
+      if (!(r.response.ok && body.status === 'ok')) {
+        emailVerificationPending = false;
+        setActionBusy(false);
+        switchModal(verificationModal, modal, function () {
+          if (body.errors) {
+            showErrors(body.errors);
+            showSignupMessage('', '');
+          } else {
+            showSignupMessage(body.message || 'Não foi possível validar os dados. Tente novamente.', 'error');
+          }
+        });
+        return { ok: false };
+      }
+
+      if (!force && emailCodeSentFor === email) {
+        emailVerificationPending = false;
+        setActionBusy(false);
+        showEmailVerificationForm(masked);
+        return { ok: true, masked: masked, already: true };
+      }
+
+      return sendEmailVerificationCode(true).then(function (result) {
+        setActionBusy(false);
+        if (!emailVerificationPending) return result;
+        emailVerificationPending = false;
+        if (result && result.ok) {
+          showEmailVerificationForm(result.masked || masked);
+        } else {
+          showEmailVerificationSendError(result && result.message);
+        }
+        return result;
+      });
+    }).catch(function () {
+      setActionBusy(false);
+      if (!emailVerificationPending) return { ok: false };
+      emailVerificationPending = false;
+      showEmailVerificationSendError('Não foi possível comunicar com o servidor. Verifique a ligação e tente novamente.');
+      return { ok: false };
+    });
+  }
+  function resumeSignupAfterVerification() {
+    emailVerificationPending = false;
+    setEmailVerificationView('verified');
+    setTimeout(function () {
+      switchModal(verificationModal, modal, function () {
+        showStep(2);
+      });
+    }, 700);
+  }
+  function cancelEmailVerification() {
+    emailVerificationPending = false;
+    closeAllModals({ animate: true, onDone: resetForm });
   }
   function showStep(step) {
     currentStep = step;
     form.querySelectorAll('.signup-step').forEach(function (item) { item.classList.toggle('hidden', Number(item.dataset.step) !== step); });
     form.querySelectorAll('[data-step-dot]').forEach(function (item) { item.className = 'signup-dot flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold ' + (Number(item.dataset.stepDot) <= step ? 'bg-slate-950 text-white' : 'bg-slate-200 text-slate-500'); });
     document.getElementById('signup-back').classList.toggle('hidden', step === 1);
-    document.getElementById('signup-next').classList.toggle('hidden', step === 3);
-    document.getElementById('signup-submit').classList.toggle('hidden', step !== 3);
+    document.getElementById('signup-next').classList.toggle('hidden', step === totalSteps);
+    document.getElementById('signup-submit').classList.toggle('hidden', step !== totalSteps);
     updateNavigationState();
-  }
-  function stepIsReady(step) {
-    var value = function (name) { return String(form.elements[name] ? form.elements[name].value : '').trim(); };
-    if (step === 1) {
-      return value('name').replace(/[^\p{L}\p{N}]/gu, '').length >= 2 &&
-        !!value('company_type') && (value('company_type') !== 'OTHER' || !!value('company_type_other')) &&
-        /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value('email')) && nuitDigits(value('nuit')).length === 9 &&
-        /^[a-z0-9-]+$/.test(value('subdomain')) && subdomainAvailable;
-    }
-    if (step === 2) {
-      syncAddressProvince();
-      var phoneOk = !form.elements.phone_national.value || phoneDigits(form.elements.phone_national.value).length === 9;
-      var phoneAltOk = !form.elements.phone_alt_national.value || phoneDigits(form.elements.phone_alt_national.value).length === 9;
-      var countryOk = !!value('address_country') && searchableSelectionValid(form.elements.address_country);
-      var provinceOk = value('address_country') !== 'MZ' || (!!form.elements.address_province_mz.value && searchableSelectionValid(form.elements.address_province_mz));
-      return phoneOk && phoneAltOk && countryOk && provinceOk && !!value('address_country') && !!value('address_province');
-    }
-    return !!value('plan_code') && !!value('billing_cycle') && !!value('business_area') && searchableSelectionValid(form.elements.business_area) && (value('business_area') !== 'OTHER' || !!value('business_area_other'));
   }
   function updateNavigationState() {
     var next = document.getElementById('signup-next');
     var submit = document.getElementById('signup-submit');
-    if (currentStep === 3) {
-      submit.disabled = submitting;
-      submit.classList.toggle('cursor-not-allowed', submitting);
-      submit.classList.toggle('opacity-50', submitting);
-      return;
-    }
-    var ready = stepIsReady(currentStep);
-    next.disabled = !ready;
-    next.classList.toggle('cursor-not-allowed', !ready);
-    next.classList.toggle('opacity-50', !ready);
+    next.disabled = false;
+    submit.disabled = submitting && currentStep === totalSteps;
+    next.classList.remove('cursor-not-allowed', 'opacity-50');
+    submit.classList.remove('cursor-not-allowed', 'opacity-50');
+    next.style.pointerEvents = submitting && currentStep !== totalSteps ? 'none' : '';
+    submit.style.pointerEvents = submitting && currentStep === totalSteps ? 'none' : '';
   }
   function fieldSlot(name) {
-    if (name === 'business_area' && form.elements.business_area._searchInput) return { field: form.elements.business_area._searchInput, slot: form.elements.business_area.closest('label').querySelector('.field-error') };
-    if (name === 'address_country' && form.elements.address_country._searchInput) return { field: form.elements.address_country._searchInput, slot: form.elements.address_country.closest('label').querySelector('.field-error') };
+    if (name === 'business_area' && form.elements.business_area && form.elements.business_area._searchInput) {
+      var businessLabel = form.elements.business_area.closest('label');
+      return { field: form.elements.business_area._searchInput, slot: businessLabel ? businessLabel.querySelector('.field-error') : null };
+    }
+    if (name === 'address_country' && form.elements.address_country && form.elements.address_country._searchInput) {
+      var countryLabel = form.elements.address_country.closest('label');
+      return { field: form.elements.address_country._searchInput, slot: countryLabel ? countryLabel.querySelector('.field-error') : null };
+    }
     if (name === 'address_province') {
       var provinceField = form.elements.address_country.value === 'MZ' ? (form.elements.address_province_mz._searchInput || form.elements.address_province_mz) : form.elements.address_province_text;
-      return { field: provinceField, slot: provinceField.closest('label').querySelector('.field-error') };
+      var provinceLabel = provinceField && provinceField.closest('label');
+      return { field: provinceField, slot: provinceLabel ? provinceLabel.querySelector('.field-error') : null };
     }
-    if ((name === 'phone' || name === 'phone_alt') && form.elements[name + '_national']) { var phoneField = form.elements[name + '_national']; return { field: phoneField, slot: phoneField.closest('label').querySelector('.field-error') }; }
+    if ((name === 'phone' || name === 'phone_alt') && form.elements[name + '_national']) {
+      var phoneField = form.elements[name + '_national'];
+      var phoneLabel = phoneField.closest('label');
+      return { field: phoneField, slot: phoneLabel ? phoneLabel.querySelector('.field-error') : null };
+    }
     var field = form.querySelector('[name="' + name + '"]');
     if (!field) return null;
-    var slot = field.closest('label').querySelector('.field-error');
-    return { field: field, slot: slot };
+    var label = field.closest('label');
+    return { field: field, slot: label ? label.querySelector('.field-error') : document.getElementById('signup-message') };
   }
-  function clearError(name) { var item = fieldSlot(name); if (item) { item.field.classList.remove('border-red-300', 'bg-red-50/30'); if (item.slot) item.slot.textContent = ''; } }
-  function setError(name, text) { var item = fieldSlot(name); if (item) { item.field.classList.add('border-red-300', 'bg-red-50/30'); if (item.slot) item.slot.textContent = text; } }
+  function clearError(name) { var item = fieldSlot(name); if (item && item.field) { item.field.classList.remove('border-red-300', 'bg-red-50/30'); if (item.slot && item.slot.id !== 'signup-message') item.slot.textContent = ''; } }
+  function setError(name, text) { var item = fieldSlot(name); if (item && item.field) { item.field.classList.add('border-red-300', 'bg-red-50/30'); if (item.slot) item.slot.textContent = text; } }
+  function fieldErrorMessage(name, entry) {
+    var message = entry && entry.message ? String(entry.message) : 'Dados inválidos.';
+    if (name === 'nuit' || /nuit/i.test(message)) {
+      return 'O NUIT informado não parece ser válido.';
+    }
+    return message;
+  }
   function showErrors(errors) {
     var first = null;
-    Object.keys(errors || {}).forEach(function (name) { var entry = errors[name] && errors[name][0]; var message = entry && entry.message ? entry.message : 'Dados inválidos.'; setError(name, message); if (!first || (fieldSteps[name] || 99) < (fieldSteps[first] || 99)) first = name; });
+    Object.keys(errors || {}).forEach(function (name) {
+      var entry = errors[name] && errors[name][0];
+      setError(name, fieldErrorMessage(name, entry));
+      if (!first || (fieldSteps[name] || 99) < (fieldSteps[first] || 99)) first = name;
+    });
     if (first) { showStep(fieldSteps[first] || 1); setTimeout(function () { var item = fieldSlot(first); if (item && item.field) item.field.focus(); }, 100); }
   }
   function updateAddressFields() {
@@ -325,12 +721,17 @@
     var normalizedBase = normalize(base); var normalizedDesignation = normalize(designation);
     return !!normalizedDesignation && (normalizedBase === normalizedDesignation || normalizedBase.endsWith(' ' + normalizedDesignation));
   }
-  function updateCompanyNamePreview() {
+  function companyDisplayName() {
     var base = String(form.elements.name.value || '').trim().replace(/\s+/g, ' ');
     var designation = companyTypeDesignation();
-    var show = form.elements.show_legal_designation.checked;
-    var preview = base;
-    if (base && show && designation && !baseEndsWithDesignation(base, designation)) preview += ', ' + designation;
+    var show = form.elements.show_legal_designation && form.elements.show_legal_designation.checked;
+    if (base && show && designation && !baseEndsWithDesignation(base, designation)) {
+      return base + ', ' + designation;
+    }
+    return base;
+  }
+  function updateCompanyNamePreview() {
+    var preview = companyDisplayName();
     var output = document.getElementById('company-name-preview');
     var wrap = document.getElementById('company-name-preview-wrap');
     output.textContent = preview;
@@ -341,17 +742,30 @@
     Object.keys(fieldSteps).forEach(function (name) { if (fieldSteps[name] === step) clearError(name); });
     var errors = {};
     function add(name, text) { errors[name] = [{ message: text }]; }
-    if (step === 1) { if (value('name').replace(/[^\p{L}\p{N}]/gu, '').length < 2) add('name', 'Indique um nome de empresa válido.'); if (!value('company_type')) add('company_type', 'Seleccione o tipo jurídico.'); if (value('company_type') === 'OTHER' && !value('company_type_other')) add('company_type_other', 'Indique o tipo jurídico.'); if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value('email'))) add('email', 'Indique um e-mail válido.'); if (!/^\d{9}$/.test(value('nuit'))) add('nuit', value('nuit') ? 'Indique um NUIT válido com 9 dígitos.' : 'Indique o NUIT da empresa.'); }
-    if (step === 1 && (!/^[a-z0-9-]+$/.test(value('subdomain')) || !subdomainAvailable)) add('subdomain', 'Indique um endereço disponível para a empresa.');
+    if (step === 1) {
+      if (value('name').replace(/[^\p{L}\p{N}]/gu, '').length < 2) add('name', 'Indique um nome de empresa válido.');
+      if (!value('company_type')) add('company_type', 'Seleccione o tipo jurídico.');
+      if (value('company_type') === 'OTHER' && !value('company_type_other')) add('company_type_other', 'Indique o tipo jurídico.');
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value('email'))) add('email', 'Indique um e-mail válido.');
+      if (!/^\d{9}$/.test(value('nuit'))) add('nuit', 'O NUIT informado não parece ser válido.');
+      if (!/^[a-z0-9-]+$/.test(value('subdomain')) || !subdomainAvailable) add('subdomain', 'Indique um endereço disponível para a empresa.');
+    }
     if (step === 2) {
       syncAddressProvince();
       if (form.elements.phone_national.value && phoneDigits(form.elements.phone_national.value).length !== 9) add('phone', 'Indique um telefone válido com 9 dígitos.');
       if (form.elements.phone_alt_national.value && phoneDigits(form.elements.phone_alt_national.value).length !== 9) add('phone_alt', 'Indique um telefone alternativo válido com 9 dígitos.');
-      if (!value('address_country')) add('address_country', 'Seleccione um país válido.');
+      if (!value('address_country') || !searchableSelectionValid(form.elements.address_country)) add('address_country', 'Seleccione um país válido.');
       if (!value('address_province')) add('address_province', 'Indique a província ou cidade e o país na morada.');
+      else if (value('address_country') === 'MZ' && !searchableSelectionValid(form.elements.address_province_mz)) add('address_province', 'Seleccione uma província válida.');
     }
-    if (step === 3) { if (!value('plan_code') || !value('billing_cycle')) add('plan_code', 'Seleccione um plano válido.'); if (!value('business_area')) add('business_area', 'Seleccione a área de actividade.'); if (value('business_area') === 'OTHER' && !value('business_area_other')) add('business_area_other', 'Indique a área de actividade.'); }
-    showErrors(errors); return Object.keys(errors).length === 0;
+    if (step === 3) {
+      if (!value('plan_code')) add('plan_code', 'Seleccione um plano válido.');
+      else if (String(value('plan_code')).toUpperCase() !== 'FREE' && !value('billing_cycle')) add('billing_cycle', 'Seleccione o ciclo de faturação.');
+      if (!value('business_area') || !searchableSelectionValid(form.elements.business_area)) add('business_area', 'Seleccione a área de actividade.');
+      if (value('business_area') === 'OTHER' && !value('business_area_other')) add('business_area_other', 'Indique a área de actividade.');
+    }
+    showErrors(errors);
+    return Object.keys(errors).length === 0;
   }
   function renderPlans(plans, list) {
     list = list || document.getElementById('plans-list'); list.textContent = '';
@@ -390,9 +804,7 @@
     return plansPromise;
   }
   function openPlanPicker() {
-    var picker = document.getElementById('plan-picker-modal');
-    picker.classList.add('is-open');
-    document.body.classList.add('modal-open');
+    openModal(pickerModal);
     if (loadedPlans.length) {
       syncPlanPickerUi('ready');
       return;
@@ -422,10 +834,267 @@
     if (!hasName) { form.elements.subdomain.value = ''; subdomainAvailable = false; document.getElementById('subdomain-availability').textContent = ''; }
     return hasName;
   }
-  function suggestSubdomain() { var name = String(form.elements.name.value || '').trim(); if (!syncSubdomainState() || form.elements.subdomain.value.trim() !== '') return; request('subdomains/suggest?name=' + encodeURIComponent(name)).then(function (r) { var data = r.body.data || {}; if (!r.response.ok || !data.subdomain || form.elements.subdomain.disabled || String(form.elements.name.value || '').trim() !== name || form.elements.subdomain.value.trim() !== '') return; form.elements.subdomain.value = data.subdomain; if (data.host) document.getElementById('subdomain-suffix').textContent = '.' + data.host.replace(data.subdomain + '.', ''); return checkSubdomain(); }); }
-  function updateProgress(state) { var stages = { pending: 0, validating: 0, provisioning_dns: 1, provisioning_cloudways: 3, creating_subscription: 4, creating_tenant: 4, sending_invite: 4, initializing_billing: 5, billing_initialized: 6, finalizing: 6, completed: 7 }; var active = stages[state.status] == null ? 0 : stages[state.status]; document.querySelectorAll('#signup-progress-steps li').forEach(function (item) { var done = Number(item.dataset.stage) < active; var now = Number(item.dataset.stage) === active; item.textContent = (done ? '✓ ' : now ? '• ' : '○ ') + item.textContent.replace(/^[✓•○] /, ''); item.className = done ? 'text-emerald-700' : now ? 'font-semibold text-slate-900' : 'text-slate-500'; }); document.getElementById('signup-progress-message').textContent = state.message || 'A preparar a sua subscrição…'; }
-  function monitor(id) { request('provisionings/' + encodeURIComponent(id)).then(function (r) { var state = r.body.data || r.body; updateProgress(state); if (state.status === 'completed') { localStorage.removeItem('sizotech_provisioning_id'); sessionStorage.removeItem('sizotech_registration_key'); var result = state.result || {}; var box = document.getElementById('signup-progress-result'); box.innerHTML = ''; box.className = 'mt-7 rounded-xl bg-emerald-50 px-4 py-4 text-sm text-emerald-900'; box.textContent = 'Subscrição concluída com sucesso. '; if (result.access_url) { var link = document.createElement('a'); link.href = result.access_url; link.className = 'font-semibold underline'; link.textContent = 'Aceder ao sistema'; box.appendChild(link); } box.classList.remove('hidden'); return; } if (state.status === 'failed') { localStorage.removeItem('sizotech_provisioning_id'); var failure = document.getElementById('signup-progress-result'); failure.textContent = state.message || 'Não foi possível concluir o cadastro.'; failure.className = 'mt-7 rounded-xl bg-red-50 px-4 py-4 text-sm text-red-700'; failure.classList.remove('hidden'); return; } setTimeout(function () { monitor(id); }, 2000); }).catch(function () { setTimeout(function () { monitor(id); }, 3000); }); }
-  function choosePlan(card) { var picker = document.getElementById('plan-picker-modal'); picker.classList.remove('is-open'); resetForm(); form.elements.plan_code.value = card.dataset.planCode; document.getElementById('signup-plan-summary').textContent = 'Plano escolhido *: ' + card.dataset.planName + ' — ' + card.dataset.planPrice; var cycle = form.elements.billing_cycle; cycle.textContent = ''; JSON.parse(card.dataset.planCycles || '["monthly"]').forEach(function (name) { var details = billingCycles[name]; cycle.add(new Option(details ? details.label : name, name, false, name === card.dataset.billingCycle)); }); cycle.value = card.dataset.billingCycle || 'monthly'; modal.classList.add('is-open'); document.body.classList.add('modal-open'); }
+  function suggestSubdomain() {
+    var name = String(form.elements.name.value || '').trim();
+    if (!syncSubdomainState() || form.elements.subdomain.value.trim() !== '') return;
+    request('subdomains/suggest?name=' + encodeURIComponent(name)).then(function (r) {
+      var data = r.body.data || {};
+      var suggested = String(data.subdomain || '').trim().toLowerCase();
+      if (!r.response.ok || !suggested || form.elements.subdomain.disabled) return;
+      if (String(form.elements.name.value || '').trim() !== name || form.elements.subdomain.value.trim() !== '') return;
+      // Nunca aplicar sugestões com sufixo numérico (sc2, marna1, …).
+      if (/\d+$/.test(suggested)) return;
+      form.elements.subdomain.value = suggested;
+      if (data.host) document.getElementById('subdomain-suffix').textContent = '.' + String(data.host).replace(suggested + '.', '');
+      return checkSubdomain();
+    });
+  }
+  var progressSteps = [
+    { title: 'A validar os dados', description: 'A verificar as informações fornecidas' },
+    { title: 'A verificar o endereço da empresa', description: 'A confirmar os dados da empresa' },
+    { title: 'A comunicar com o servidor', description: 'A estabelecer uma ligação segura' },
+    { title: 'A configurar o acesso', description: 'A preparar os dados iniciais da conta' },
+    { title: 'A activar a subscrição', description: 'A registar a subscrição seleccionada' },
+    { title: 'A preparar a facturação', description: 'A configurar os dados iniciais de facturação' },
+    { title: 'A concluir', description: 'A finalizar esta etapa' }
+  ];
+  var progressIndex = 0;
+  var progressTarget = 0;
+  var progressFinished = false;
+  var progressFailed = false;
+  var progressAwaitingComplete = false;
+  var progressStepStartedAt = 0;
+  var progressStepTimer = null;
+  var MIN_STEP_MS = 2000;
+  function clearProgressTimer() {
+    if (progressStepTimer) {
+      clearTimeout(progressStepTimer);
+      progressStepTimer = null;
+    }
+  }
+  function progressEls() {
+    return {
+      title: document.getElementById('signup-progress-title'),
+      subtitle: document.getElementById('signup-progress-subtitle'),
+      process: document.getElementById('signup-progress-process'),
+      success: document.getElementById('signup-progress-success'),
+      bar: document.getElementById('signup-progress-bar'),
+      counter: document.getElementById('signup-progress-counter'),
+      percent: document.getElementById('signup-progress-percent'),
+      box: document.getElementById('signup-progress-step-box'),
+      stepTitle: document.getElementById('signup-progress-step-title'),
+      normal: document.getElementById('signup-progress-normal'),
+      desc: document.getElementById('signup-progress-step-desc'),
+      error: document.getElementById('signup-progress-error'),
+      errorText: document.getElementById('signup-progress-error-text')
+    };
+  }
+  function renderProgressStep(index) {
+    var els = progressEls();
+    var step = progressSteps[index] || progressSteps[0];
+    var percentage = Math.round(((index + 1) / progressSteps.length) * 100);
+    progressIndex = index;
+    progressStepStartedAt = Date.now();
+    els.bar.style.width = percentage + '%';
+    els.percent.textContent = percentage + '%';
+    els.counter.textContent = 'Etapa ' + (index + 1) + ' de ' + progressSteps.length;
+    els.box.classList.remove('signup-step-enter');
+    void els.box.offsetWidth;
+    els.stepTitle.textContent = step.title;
+    els.desc.textContent = step.description;
+    els.normal.classList.remove('hidden');
+    els.error.classList.add('hidden');
+    els.bar.classList.remove('bg-red-500');
+    els.bar.classList.add('bg-slate-900');
+    els.counter.classList.remove('text-red-400');
+    els.counter.classList.add('text-slate-400');
+    els.percent.classList.remove('text-red-400');
+    els.percent.classList.add('text-slate-400');
+    els.box.classList.add('signup-step-enter');
+  }
+  function advanceProgressUi() {
+    clearProgressTimer();
+    if (progressFailed || progressFinished) return;
+    var elapsed = Date.now() - progressStepStartedAt;
+    var wait = Math.max(0, MIN_STEP_MS - elapsed);
+    if (progressIndex < progressTarget) {
+      progressStepTimer = setTimeout(function () {
+        renderProgressStep(progressIndex + 1);
+        advanceProgressUi();
+      }, wait);
+      return;
+    }
+    if (progressAwaitingComplete && progressIndex >= progressSteps.length - 1) {
+      progressStepTimer = setTimeout(function () {
+        finishProgress();
+      }, wait);
+    }
+  }
+  function resetProgressUi() {
+    var els = progressEls();
+    clearProgressTimer();
+    progressFinished = false;
+    progressFailed = false;
+    progressAwaitingComplete = false;
+    progressIndex = 0;
+    progressTarget = 0;
+    els.title.textContent = 'A preparar a sua subscrição';
+    els.subtitle.classList.remove('hidden');
+    els.subtitle.textContent = 'Aguarde enquanto concluímos esta etapa.';
+    els.process.classList.remove('hidden', 'signup-process-leave');
+    els.success.classList.add('hidden');
+    els.success.classList.remove('signup-final-pop');
+    renderProgressStep(0);
+  }
+  function failProgress(message) {
+    if (progressFinished) return;
+    progressFailed = true;
+    progressAwaitingComplete = false;
+    clearProgressTimer();
+    var els = progressEls();
+    els.normal.classList.add('hidden');
+    els.error.classList.remove('hidden');
+    els.errorText.textContent = message || 'Não foi possível concluir o cadastro. Tente novamente.';
+    els.bar.classList.remove('bg-slate-900');
+    els.bar.classList.add('bg-red-500');
+    els.counter.classList.remove('text-slate-400');
+    els.counter.classList.add('text-red-400');
+    els.percent.classList.remove('text-slate-400');
+    els.percent.classList.add('text-red-400');
+  }
+  function finishProgress() {
+    if (progressFinished || progressFailed) return;
+    progressFinished = true;
+    clearProgressTimer();
+    var els = progressEls();
+    els.bar.style.width = '100%';
+    els.percent.textContent = '100%';
+    setTimeout(function () {
+      els.process.classList.add('signup-process-leave');
+      setTimeout(function () {
+        els.process.classList.add('hidden');
+        els.process.classList.remove('signup-process-leave');
+        els.title.textContent = 'Preparação concluída';
+        els.subtitle.classList.add('hidden');
+        els.success.classList.remove('hidden');
+        els.success.classList.remove('signup-final-pop');
+        void els.success.offsetWidth;
+        els.success.classList.add('signup-final-pop');
+      }, 130);
+    }, 200);
+  }
+  function updateProgress(state) {
+    var stages = {
+      pending: 0, validating: 0, provisioning_dns: 1, provisioning_cloudways: 2,
+      creating_subscription: 3, creating_tenant: 4, initializing_billing: 5,
+      billing_initialized: 5, finalizing: 6, sending_invite: 6, completed: 6
+    };
+    var active = stages[state && state.status];
+    if (active == null) active = progressTarget;
+    if (active > progressTarget) progressTarget = active;
+    if (state && state.status === 'completed') {
+      progressTarget = progressSteps.length - 1;
+      progressAwaitingComplete = true;
+    }
+    advanceProgressUi();
+  }
+  function monitor(id) {
+    if (monitorTimer) {
+      clearTimeout(monitorTimer);
+      monitorTimer = null;
+    }
+    request('provisionings/' + encodeURIComponent(id)).then(function (r) {
+      if (!progressModal.classList.contains('is-open')) return;
+      var state = r.body.data || r.body;
+      if (!r.response.ok || r.response.status === 404 || state.status === 'not_found') {
+        monitorTimer = setTimeout(function () { monitor(id); }, 2000);
+        return;
+      }
+      updateProgress(state);
+      if (state.status === 'completed') {
+        localStorage.removeItem('sizotech_provisioning_id');
+        sessionStorage.removeItem('sizotech_registration_key');
+        updateProgress({ status: 'completed' });
+        return;
+      }
+      if (state.status === 'failed') {
+        localStorage.removeItem('sizotech_provisioning_id');
+        failProgress(state.message || 'Não foi possível concluir o cadastro. Tente novamente.');
+        return;
+      }
+      monitorTimer = setTimeout(function () { monitor(id); }, 2000);
+    }).catch(function () {
+      if (!progressModal.classList.contains('is-open')) return;
+      monitorTimer = setTimeout(function () { monitor(id); }, 3000);
+    });
+  }
+  function syncBillingCycleVisibility() {
+    var wrap = document.getElementById('signup-billing-cycle-wrap');
+    var cycle = form.elements.billing_cycle;
+    if (!wrap || !cycle) return;
+    var isFree = String(form.elements.plan_code.value || '').toUpperCase() === 'FREE';
+    wrap.classList.toggle('hidden', isFree);
+    if (isFree) {
+      if (![].some.call(cycle.options, function (opt) { return opt.value === 'monthly'; })) {
+        cycle.add(new Option('Mensal', 'monthly', true, true));
+      }
+      cycle.value = 'monthly';
+    }
+    updatePlanTotalBadge();
+  }
+  function findLoadedPlan(code) {
+    code = String(code || '').toUpperCase();
+    for (var i = 0; i < loadedPlans.length; i += 1) {
+      if (String(loadedPlans[i].code || '').toUpperCase() === code) return loadedPlans[i];
+    }
+    return null;
+  }
+  function updatePlanTotalBadge() {
+    var wrap = document.getElementById('signup-plan-total');
+    if (!wrap) return;
+    var planCode = String(form.elements.plan_code.value || '').toUpperCase();
+    var cycleName = String(form.elements.billing_cycle.value || 'monthly');
+    var cycle = billingCycles[cycleName] || billingCycles.monthly;
+    var plan = findLoadedPlan(planCode);
+    if (!plan || planCode === 'FREE' || cycleName === 'monthly' || cycle.months <= 1) {
+      wrap.classList.add('hidden');
+      wrap.textContent = '';
+      return;
+    }
+    var price = plan.price || {};
+    var currency = price.currency || 'MZN';
+    var total = Number(price.amount || 0) * cycle.months;
+    wrap.innerHTML = '<strong class="font-semibold text-slate-900">Total:</strong> ' + formatMoney(total) + ' ' + currency + cycle.period;
+    wrap.classList.remove('hidden');
+  }
+  function setPlanSummary(planName, monthlyLabel) {
+    var summary = document.getElementById('signup-plan-summary');
+    if (!summary) return;
+    summary.innerHTML = '<strong class="font-semibold text-slate-900">Plano escolhido *:</strong> ' + String(planName || '') + ' ' + String(monthlyLabel || '');
+  }
+  function choosePlan(card) {
+    if (!card) return;
+    var planCode = card.dataset.planCode;
+    var planName = card.dataset.planName;
+    var planCycles = card.dataset.planCycles;
+    var cardCycle = card.dataset.billingCycle;
+    var plan = findLoadedPlan(planCode);
+    var price = (plan && plan.price) || {};
+    var currency = price.currency || 'MZN';
+    var monthlyLabel = formatMoney(Number(price.amount || 0)) + ' ' + currency + '/mês';
+    resetForm();
+    form.elements.plan_code.value = planCode;
+    setPlanSummary(planName, monthlyLabel);
+    var cycle = form.elements.billing_cycle;
+    cycle.textContent = '';
+    JSON.parse(planCycles || '["monthly"]').forEach(function (name) {
+      var details = billingCycles[name];
+      cycle.add(new Option(details ? details.label : name, name, false, name === cardCycle));
+    });
+    cycle.value = cardCycle || 'monthly';
+    syncBillingCycleVisibility();
+    openModal(modal);
+  }
   document.addEventListener('click', function (event) { var card = event.target.closest('.signup-plan-card'); if (card) choosePlan(card); });
   document.addEventListener('keydown', function (event) { var card = event.target.closest && event.target.closest('.signup-plan-card'); if (card && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); choosePlan(card); } });
   document.querySelectorAll('[data-open-plan-picker]').forEach(function (button) { button.addEventListener('click', openPlanPicker); });
@@ -436,8 +1105,33 @@
     loadPlans(true);
   });
   document.querySelectorAll('[data-billing-cycle]').forEach(function (button) { button.addEventListener('click', function () { selectedBillingCycle = button.dataset.billingCycle; document.querySelectorAll('[data-billing-cycle]').forEach(function (item) { var active = item === button; item.setAttribute('aria-pressed', active ? 'true' : 'false'); item.className = active ? 'rounded-lg bg-slate-950 px-4 py-2 text-sm font-semibold text-white shadow-sm' : 'rounded-lg px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-white hover:text-slate-950'; }); if (loadedPlans.length) renderPlans(loadedPlans); }); });
-  document.querySelectorAll('[data-close-plan-picker]').forEach(function (button) { button.addEventListener('click', function () { document.getElementById('plan-picker-modal').classList.remove('is-open'); document.body.classList.remove('modal-open'); }); });
-  document.querySelectorAll('[data-signup-close]').forEach(function (button) { button.addEventListener('click', function () { modal.classList.remove('is-open'); document.body.classList.remove('modal-open'); resetForm(); }); });
+  document.querySelectorAll('[data-close-plan-picker]').forEach(function (button) {
+    button.addEventListener('click', function () { closeAllModals({ animate: true }); });
+  });
+  document.querySelectorAll('[data-signup-close]').forEach(function (button) {
+    button.addEventListener('click', function () {
+      closeAllModals({ animate: true, onDone: resetForm });
+    });
+  });
+  document.querySelectorAll('[data-close-progress]').forEach(function (button) {
+    button.addEventListener('click', function () {
+      localStorage.removeItem('sizotech_provisioning_id');
+      closeAllModals({ animate: true });
+    });
+  });
+  document.addEventListener('keydown', function (event) {
+    if (event.key !== 'Escape') return;
+    if (verificationModal.classList.contains('is-open')) {
+      cancelEmailVerification();
+      return;
+    }
+    if (!document.querySelector('.signup-modal.is-open')) return;
+    localStorage.removeItem('sizotech_provisioning_id');
+    closeAllModals({ animate: true, onDone: function () {
+      if (modal && !modal.classList.contains('hidden')) return;
+      resetForm();
+    }});
+  });
   setupPhoneField('phone'); setupPhoneField('phone_alt');
   setupBusinessAreaField();
   setupSearchableSelect(form.elements.address_country, 'Pesquisar país…');
@@ -445,6 +1139,7 @@
   form.querySelector('[data-step="1"]').appendChild(form.elements.subdomain.closest('label'));
   syncSubdomainState();
   form.elements.company_type.addEventListener('change', syncOther);
+  form.elements.billing_cycle.addEventListener('change', updatePlanTotalBadge);
   form.elements.name.addEventListener('input', updateCompanyNamePreview);
   form.elements.company_type_other.addEventListener('input', updateCompanyNamePreview);
   form.elements.show_legal_designation.addEventListener('change', updateCompanyNamePreview);
@@ -459,36 +1154,36 @@
   form.elements.name.addEventListener('input', function () { clearTimeout(suggestTimer); if (!syncSubdomainState()) return; if (!form.elements.subdomain.value.trim()) suggestTimer = setTimeout(suggestSubdomain, 500); });
   form.elements.subdomain.addEventListener('input', function () { clearTimeout(checkTimer); subdomainAvailable = false; var status = document.getElementById('subdomain-availability'); status.textContent = this.value.trim() ? 'A verificar…' : ''; status.className = 'mt-1 block text-xs text-slate-500'; updateNavigationState(); checkTimer = setTimeout(checkSubdomain, 400); });
   form.querySelectorAll('input, select').forEach(function (field) { field.addEventListener('input', function () { clearError(field.name); updateNavigationState(); }); field.addEventListener('change', function () { clearError(field.name); updateNavigationState(); }); });
-  form.addEventListener('keydown', function (event) {
-    if (event.key !== 'Enter' || event.isComposing || event.target.closest('button')) return;
-    if (event.target.matches('[data-select-search]')) { event.preventDefault(); return; }
-    if (currentStep >= 3) return;
-    if (event.target.matches('input[list]')) {
-      var searchableSelect = event.target === form.elements.address_country._searchInput ? form.elements.address_country : form.elements.address_province_mz;
-      var selectedOption = searchableSelect.options[searchableSelect.selectedIndex];
-      if (!selectedOption || event.target.value.trim() !== selectedOption.textContent.trim()) { event.preventDefault(); return; }
+  function commitSearchableSelect(searchInput) {
+    var select = form.elements[searchInput.dataset.selectSearch];
+    if (!select || !select._searchOptions) return false;
+    var menu = searchInput.parentNode.querySelector('[role="listbox"]');
+    var typed = searchInput.value.trim().toLocaleLowerCase('pt');
+    var source = select._searchOptions;
+    var exact = source.filter(function (item) {
+      return !item.disabled && item.label.toLocaleLowerCase('pt') === typed;
+    })[0];
+    var firstBtn = menu && !menu.classList.contains('hidden') && menu.querySelector('button');
+    var firstItem = firstBtn && source.filter(function (item) { return String(item.value) === String(firstBtn.dataset.value); })[0];
+    var current = source.filter(function (item) { return item.value === select.value; })[0];
+    var chosen = exact || firstItem || current;
+    if (!chosen) return false;
+    var changed = select.value !== chosen.value;
+    select.value = chosen.value;
+    searchInput.value = chosen.label;
+    if (menu) {
+      menu.classList.add('hidden');
+      searchInput.setAttribute('aria-expanded', 'false');
     }
-    event.preventDefault();
-    document.getElementById('signup-next').click();
-  });
-  document.getElementById('signup-next').addEventListener('click', function () { if (validateStep(currentStep)) showStep(currentStep + 1); });
-  document.getElementById('signup-back').addEventListener('click', function () { showStep(currentStep - 1); });
-  form.addEventListener('submit', function (event) {
-    event.preventDefault();
-    if (submitting) return;
-    showSignupMessage('', '');
-    syncAddressProvince();
-    if (!validateStep(3)) {
-      showSignupMessage('Verifique os campos assinalados antes de concluir o cadastro.', 'error');
-      return;
-    }
-    var button = document.getElementById('signup-submit');
-    submitting = true;
-    button.disabled = true;
-    button.textContent = 'A processar…';
-    updateNavigationState();
-
-    var data = {
+    if (changed) select.dispatchEvent(new Event('change', { bubbles: true }));
+    return true;
+  }
+  function isEnterKey(event) {
+    return event.key === 'Enter' || event.code === 'Enter' || event.code === 'NumpadEnter' || event.which === 13;
+  }
+  function formPayload() {
+    try { syncAddressProvince(); } catch (e) {}
+    return {
       name: String(form.elements.name.value || '').trim(),
       company_type: String(form.elements.company_type.value || '').trim(),
       company_type_other: String(form.elements.company_type_other.value || '').trim(),
@@ -498,78 +1193,369 @@
       phone: String(form.elements.phone.value || '').trim(),
       phone_alt: String(form.elements.phone_alt.value || '').trim(),
       business_area: String(form.elements.business_area.value || '').trim(),
-      business_area_other: String(form.elements.business_area_other.value || '').trim(),
+      business_area_other: String((form.elements.business_area_other && form.elements.business_area_other.value) || '').trim(),
       address_country: String(form.elements.address_country.value || '').trim(),
       address_province: String(form.elements.address_province.value || '').trim(),
       address_street: String(form.elements.address_street.value || '').trim(),
       address_neighborhood: String(form.elements.address_neighborhood.value || '').trim(),
       address_house_number: String(form.elements.address_house_number.value || '').trim(),
       plan_code: String(form.elements.plan_code.value || '').trim(),
-      billing_cycle: String(form.elements.billing_cycle.value || '').trim(),
-      subdomain: String(form.elements.subdomain.value || '').trim().toLowerCase()
+      billing_cycle: String(form.elements.plan_code.value || '').toUpperCase() === 'FREE'
+        ? 'monthly'
+        : String(form.elements.billing_cycle.value || '').trim(),
+      subdomain: String(form.elements.subdomain.value || '').trim().toLowerCase(),
+      email_verification_token: emailVerificationToken
     };
-
-    request('registrations', {
+  }
+  function setActionBusy(busy) {
+    submitting = !!busy;
+    updateNavigationState();
+  }
+  function validateStepWithApi(step) {
+    showSignupMessage('', '');
+    if (!validateStep(step)) return Promise.resolve(false);
+    var apiStep = formApiStep(step);
+    if (!apiStep) return Promise.resolve(true);
+    setActionBusy(true);
+    return request('registrations/validate', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-CSRF-Token': currentCsrf(),
-        'Idempotency-Key': getKey()
-      },
-      body: JSON.stringify(data)
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': currentCsrf() },
+      body: JSON.stringify(Object.assign({ step: apiStep }, formPayload()))
     }).then(function (r) {
-      submitting = false;
-      button.disabled = false;
-      button.textContent = 'Concluir cadastro';
-      updateNavigationState();
-
       var body = r.body || {};
-      var provisioningId = body.provisioning_id || (body.data && body.data.provisioning_id);
-      if ((r.response.status === 202 || r.response.status === 201) && provisioningId) {
-        localStorage.setItem('sizotech_provisioning_id', String(provisioningId));
-        modal.classList.remove('is-open');
-        document.body.classList.remove('modal-open');
-        progressModal.classList.add('is-open');
-        document.body.classList.add('modal-open');
-        updateProgress(body.data || body);
-        monitor(provisioningId);
-        return;
-      }
-      if (r.response.status === 201 || r.response.ok) {
-        var result = body.company || (body.data && body.data.company) || body.data || body;
-        modal.classList.remove('is-open');
-        progressModal.classList.add('is-open');
-        document.body.classList.add('modal-open');
-        document.getElementById('signup-progress-message').textContent = body.message || 'Cadastro concluído com sucesso.';
-        var box = document.getElementById('signup-progress-result');
-        box.innerHTML = '';
-        box.className = 'mt-7 rounded-xl bg-emerald-50 px-4 py-4 text-sm text-emerald-900';
-        box.textContent = 'A empresa foi criada. ';
-        if (result && result.access_url) {
-          var link = document.createElement('a');
-          link.href = result.access_url;
-          link.className = 'font-semibold underline';
-          link.textContent = 'Aceder ao sistema';
-          box.appendChild(link);
-        }
-        box.classList.remove('hidden');
-        sessionStorage.removeItem('sizotech_registration_key');
-        return;
-      }
+      if (r.response.ok && body.status === 'ok') return true;
+      setActionBusy(false);
       if (body.errors) {
         showErrors(body.errors);
-        showSignupMessage(body.message || 'Existem erros nos dados enviados. Corrija e tente novamente.', 'error');
+        return false;
+      }
+      showSignupMessage(body.message || 'Não foi possível validar os dados. Tente novamente.', 'error');
+      return false;
+    }).catch(function () {
+      setActionBusy(false);
+      showSignupMessage('Não foi possível comunicar com o servidor. Verifique a ligação e tente novamente.', 'error');
+      return false;
+    });
+  }
+  function sendEmailVerificationCode(force) {
+    var email = String(form.elements.email.value || '').trim().toLowerCase();
+    if (!force && emailCodeSentFor === email) {
+      return Promise.resolve({ ok: true, masked: maskEmailLocal(email), already: true });
+    }
+    setActionBusy(true);
+    return request('registrations/email-code/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': currentCsrf() },
+      body: JSON.stringify({ email: email, name: companyDisplayName() })
+    }).then(function (r) {
+      var body = r.body || {};
+      setActionBusy(false);
+      if (r.response.ok && body.status === 'ok') {
+        emailCodeSentFor = email;
+        var data = body.data || {};
+        startResendCountdown(data.resend_after_seconds || 60);
+        clearOtpInputs();
+        return { ok: true, masked: data.masked_email || maskEmailLocal(email) };
+      }
+      if (r.response.status === 429) {
+        startResendCountdown((body.retry_after || 60));
+        return {
+          ok: false,
+          message: body.message || 'Aguarde alguns segundos antes de pedir um novo código.'
+        };
+      }
+      if (body.errors) {
+        var first = Object.keys(body.errors)[0];
+        var errMsg = first && body.errors[first] && body.errors[first][0] && body.errors[first][0].message;
+        return { ok: false, message: errMsg || 'Não foi possível enviar o código. Tente novamente.' };
+      }
+      return { ok: false, message: body.message || 'Não foi possível enviar o código. Tente novamente.' };
+    }).catch(function () {
+      setActionBusy(false);
+      return { ok: false, message: 'Não foi possível comunicar com o servidor. Verifique a ligação e tente novamente.' };
+    });
+  }
+  function verifyEmailCode() {
+    var email = String(form.elements.email.value || '').trim().toLowerCase();
+    var code = otpCode();
+    if (!/^\d{4}$/.test(code)) {
+      showVerificationError('Introduza o código de 4 dígitos enviado por e-mail.');
+      return Promise.resolve(false);
+    }
+    setActionBusy(true);
+    updateConfirmButton();
+    if (confirmButton) confirmButton.innerHTML = '<span class="button-loader"></span>';
+    return request('registrations/email-code/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': currentCsrf() },
+      body: JSON.stringify({ email: email, code: code })
+    }).then(function (r) {
+      var body = r.body || {};
+      setActionBusy(false);
+      if (confirmButton) confirmButton.innerHTML = 'Confirmar código';
+      updateConfirmButton();
+      if (r.response.ok && body.status === 'ok' && body.data && body.data.verification_token) {
+        emailVerificationToken = String(body.data.verification_token);
+        emailVerifiedFor = email;
+        clearVerificationError();
+        return true;
+      }
+      var message = (body.errors && body.errors.code && body.errors.code[0] && body.errors.code[0].message)
+        || body.message
+        || 'O código introduzido é inválido ou expirou.';
+      showVerificationError(message);
+      return false;
+    }).catch(function () {
+      setActionBusy(false);
+      if (confirmButton) confirmButton.innerHTML = 'Confirmar código';
+      updateConfirmButton();
+      showVerificationError('Não foi possível comunicar com o servidor. Verifique a ligação e tente novamente.');
+      return false;
+    });
+  }
+  function goToNextStep() {
+    if (currentStep >= totalSteps || submitting) return;
+    var focusEl = document.activeElement;
+    var searchInput = focusEl && focusEl.closest && focusEl.closest('[data-select-search]');
+    if (searchInput && modal.contains(searchInput)) commitSearchableSelect(searchInput);
+
+    if (currentStep === 1) {
+      showSignupMessage('', '');
+      if (!validateStep(1)) return;
+      var email = String(form.elements.email.value || '').trim().toLowerCase();
+      if (emailVerificationToken && emailVerifiedFor === email) {
+        showStep(2);
         return;
       }
-      showSignupMessage(body.message || 'Não foi possível concluir o cadastro neste momento. Tente novamente.', 'error');
-    }).catch(function () {
+      beginEmailVerificationFlow(emailCodeSentFor !== email);
+      return;
+    }
+
+    validateStepWithApi(currentStep).then(function (ok) {
+      if (!ok) return;
       submitting = false;
-      button.disabled = false;
-      button.textContent = 'Concluir cadastro';
-      updateNavigationState();
-      showSignupMessage('Não foi possível comunicar com o servidor. Verifique a ligação e tente novamente.', 'error');
+      showStep(currentStep + 1);
+    });
+  }
+  function handleSignupEnter(event) {
+    if (!isEnterKey(event) || event.isComposing) return;
+    if (!modal.classList.contains('is-open')) return;
+    var target = event.target;
+    var active = document.activeElement;
+    var inModal = (target && modal.contains(target)) || (active && modal.contains(active));
+    if (!inModal) return;
+    if (target && target.closest && target.closest('[data-signup-close]')) return;
+    if (target && (target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (target && target.closest && target.closest('#signup-back')) {
+      if (currentStep > 1) showStep(currentStep - 1);
+      return;
+    }
+
+    var searchInput = (active && active.closest && active.closest('[data-select-search]'))
+      || (target && target.closest && target.closest('[data-select-search]'));
+    if (searchInput) commitSearchableSelect(searchInput);
+
+    if (currentStep >= totalSteps) {
+      submitSignup();
+      return;
+    }
+    goToNextStep();
+  }
+  document.addEventListener('keydown', handleSignupEnter, true);
+  document.getElementById('signup-next').addEventListener('click', function () { goToNextStep(); });
+  document.getElementById('signup-back').addEventListener('click', function () { showStep(currentStep - 1); });
+  form.elements.email.addEventListener('input', function () {
+    var email = String(form.elements.email.value || '').trim().toLowerCase();
+    if (emailVerifiedFor && email !== emailVerifiedFor) invalidateEmailVerification();
+    if (emailCodeSentFor && email !== emailCodeSentFor) {
+      emailCodeSentFor = '';
+      clearOtpInputs();
+    }
+  });
+  otpInputs.forEach(function (input, index) {
+    input.addEventListener('input', function () {
+      input.value = String(input.value || '').replace(/\D/g, '').slice(0, 1);
+      clearVerificationError();
+      if (input.value && index < otpInputs.length - 1) otpInputs[index + 1].focus();
+      updateConfirmButton();
+    });
+    input.addEventListener('keydown', function (event) {
+      if (event.key === 'Backspace' && !input.value && index > 0) {
+        otpInputs[index - 1].focus();
+      }
+      if (isEnterKey(event)) {
+        event.preventDefault();
+        if (otpCode().length === 4) verificationForm.requestSubmit();
+      }
+    });
+    input.addEventListener('paste', function (event) {
+      event.preventDefault();
+      var pasted = String((event.clipboardData || window.clipboardData).getData('text') || '').replace(/\D/g, '').slice(0, 4);
+      if (!pasted) return;
+      pasted.split('').forEach(function (digit, i) {
+        if (otpInputs[i]) otpInputs[i].value = digit;
+      });
+      otpInputs[Math.min(pasted.length, otpInputs.length) - 1].focus();
+      clearVerificationError();
+      updateConfirmButton();
     });
   });
-  var pending = localStorage.getItem('sizotech_provisioning_id'); if (pending) { progressModal.classList.add('is-open'); document.body.classList.add('modal-open'); monitor(pending); }
+  verificationForm.addEventListener('submit', function (event) {
+    event.preventDefault();
+    if (submitting) return;
+    verifyEmailCode().then(function (ok) {
+      if (!ok) return;
+      resumeSignupAfterVerification();
+    });
+  });
+  document.getElementById('resendButton').addEventListener('click', function () {
+    if (submitting) return;
+    var email = String(form.elements.email.value || '').trim().toLowerCase();
+    var masked = maskEmailLocal(email);
+    var resendMessage = document.getElementById('resendMessage');
+    if (resendMessage) resendMessage.classList.add('hidden');
+    emailVerificationToken = '';
+    emailVerifiedFor = '';
+    setEmailVerificationView('sending', { masked: masked });
+    sendEmailVerificationCode(true).then(function (result) {
+      if (!result || !result.ok) {
+        showEmailVerificationSendError(result && result.message ? result.message : 'Não foi possível reenviar o código. Tente novamente.');
+        return;
+      }
+      showEmailVerificationForm(result.masked || masked);
+      if (resendMessage) {
+        resendMessage.classList.remove('hidden');
+        setTimeout(function () { resendMessage.classList.add('hidden'); }, 3500);
+      }
+    });
+  });
+  var retrySend = document.getElementById('email-verification-retry');
+  if (retrySend) {
+    retrySend.addEventListener('click', function () {
+      if (submitting) return;
+      beginEmailVerificationFlow(true);
+    });
+  }
+  document.querySelectorAll('[data-close-email-verification]').forEach(function (button) {
+    button.addEventListener('click', function () { cancelEmailVerification(); });
+  });
+  function restoreSubmitButton() {
+    var button = document.getElementById('signup-submit');
+    if (button) button.textContent = 'Concluir cadastro';
+    setActionBusy(false);
+  }
+  function beginProvisioning(state, provisioningId) {
+    submitting = false;
+    resetProgressUi();
+    openModal(progressModal);
+    if (provisioningId) {
+      localStorage.setItem('sizotech_provisioning_id', String(provisioningId));
+      updateProgress(state || {});
+      monitor(provisioningId);
+      return;
+    }
+    updateProgress({ status: 'completed' });
+  }
+  function submitSignup() {
+    if (submitting) return;
+    if (currentStep < totalSteps) {
+      goToNextStep();
+      return;
+    }
+    var email = String(form.elements.email.value || '').trim().toLowerCase();
+    if (!emailVerificationToken || emailVerifiedFor !== email) {
+      showSignupMessage('', '');
+      showStep(1);
+      beginEmailVerificationFlow(true);
+      return;
+    }
+    showSignupMessage('', '');
+    var focusEl = document.activeElement;
+    var searchInput = focusEl && focusEl.closest && focusEl.closest('[data-select-search]');
+    if (searchInput && modal.contains(searchInput)) commitSearchableSelect(searchInput);
+    validateStepWithApi(totalSteps).then(function (ok) {
+      if (!ok) {
+        showStep(totalSteps);
+        return;
+      }
+      resetProgressUi();
+      openModal(progressModal);
+
+      request('registrations', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': currentCsrf(),
+          'Idempotency-Key': getKey()
+        },
+        body: JSON.stringify(formPayload())
+      }).then(function (r) {
+      var body = r.body || {};
+      if (isIdempotencyConflict(body) && !idempotencyRetry) {
+        idempotencyRetry = true;
+        newKey();
+        submitting = false;
+        submitSignup();
+        return;
+      }
+      idempotencyRetry = false;
+      var provisioningId = body.provisioning_id || (body.data && body.data.provisioning_id);
+      if ((r.response.status === 202 || r.response.status === 201) && provisioningId) {
+        beginProvisioning(body.data || body, provisioningId);
+        return;
+      }
+      if (r.response.status === 201) {
+        sessionStorage.removeItem('sizotech_registration_key');
+        beginProvisioning({ status: 'completed' });
+        return;
+      }
+      restoreSubmitButton();
+      closeAllModals();
+      openModal(modal);
+      newKey();
+      if (body.errors) {
+        if (body.errors.email_verification_token) {
+          invalidateEmailVerification();
+          showStep(1);
+          beginEmailVerificationFlow(true);
+          return;
+        }
+        showErrors(body.errors);
+        showSignupMessage('', '');
+        return;
+      }
+      showSignupMessage(
+        /nuit/i.test(String(body.message || ''))
+          ? 'O NUIT informado não parece ser válido.'
+          : (body.message || 'Não foi possível concluir o cadastro. Tente novamente.'),
+        'error'
+      );
+    }).catch(function () {
+      restoreSubmitButton();
+      closeAllModals();
+      openModal(modal);
+      newKey();
+      showSignupMessage('Não foi possível comunicar com o servidor. Verifique a ligação e tente novamente.', 'error');
+    });
+    });
+  }
+  document.getElementById('signup-submit').addEventListener('click', function (event) {
+    event.preventDefault();
+    submitSignup();
+  });
+  form.addEventListener('submit', function (event) {
+    event.preventDefault();
+    if (currentStep < totalSteps) {
+      goToNextStep();
+      return;
+    }
+    submitSignup();
+  });
+  closeAllModals();
+  try { localStorage.removeItem('sizotech_provisioning_id'); } catch (e) {}
   updateNavigationState(); loadPlans(); loadTypes();
 })();
