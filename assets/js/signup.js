@@ -13,11 +13,12 @@
 
   var currentStep = 1;
   var loadedPlans = [];
+  var plansPromise = null;
   var selectedBillingCycle = 'monthly';
   var subdomainAvailable = false;
   var suggestTimer = null;
   var checkTimer = null;
-  var csrf = (form.elements.csrf && form.elements.csrf.value) || '';
+  var submitting = false;
   var fieldSteps = { name: 1, company_type: 1, company_type_other: 1, email: 1, nuit: 1, subdomain: 1, phone: 2, phone_alt: 2, address_country: 2, address_province: 2, address_street: 2, address_neighborhood: 2, address_house_number: 2, business_area: 3, business_area_other: 3, plan_code: 3, billing_cycle: 3 };
   var billingCycles = {
     monthly: { label: 'Mensal', period: '/mês', months: 1 },
@@ -87,7 +88,67 @@
     return input;
   }
   function syncSearchableSelect(select, useDefault) { if (select && select._searchInput) { select._searchInput.value = ''; select._renderSearchOptions('', !!useDefault); } }
-  function searchableSelectionValid(select) { var option = select && select.options[select.selectedIndex]; return !!option && !!select._searchInput && select._searchInput.value.trim() === option.textContent.trim(); }
+  function searchableSelectionValid(select) {
+    if (!select) return false;
+    var option = select.options[select.selectedIndex];
+    if (!option || !select.value) return false;
+    if (!select._searchInput) return true;
+    return select._searchInput.value.trim() === option.textContent.trim();
+  }
+  function currentCsrf() {
+    return (form.elements.csrf && form.elements.csrf.value) || '';
+  }
+  function showSignupMessage(text, kind) {
+    var message = document.getElementById('signup-message');
+    if (!message) return;
+    message.textContent = text || '';
+    if (!text) {
+      message.className = 'hidden mt-5 rounded-lg px-4 py-3 text-sm';
+      return;
+    }
+    message.className = 'mt-5 rounded-lg px-4 py-3 text-sm ' + (kind === 'ok'
+      ? 'bg-emerald-50 text-emerald-800'
+      : 'bg-red-50 text-red-700');
+  }
+  function extractPlans(body) {
+    if (Array.isArray(body && body.data)) return body.data;
+    if (Array.isArray(body && body.plans)) return body.plans;
+    if (Array.isArray(body)) return body;
+    return [];
+  }
+  function syncPlanPickerUi(state) {
+    var loading = document.getElementById('plan-picker-loading');
+    var list = document.getElementById('plan-picker-list');
+    var pageLoading = document.getElementById('plans-loading');
+    var pageError = document.getElementById('plans-error');
+    if (state === 'loading') {
+      if (loading) { loading.textContent = 'A carregar planos…'; loading.classList.remove('hidden'); }
+      if (list) list.classList.add('hidden');
+      if (pageLoading) pageLoading.classList.remove('hidden');
+      if (pageError) pageError.classList.add('hidden');
+      return;
+    }
+    if (state === 'error') {
+      if (loading) {
+        loading.innerHTML = 'Não foi possível carregar os planos. <button type="button" data-retry-plans class="ml-1 font-semibold text-brand underline">Tentar novamente</button>';
+        loading.classList.remove('hidden');
+      }
+      if (list) list.classList.add('hidden');
+      if (pageLoading) pageLoading.classList.add('hidden');
+      if (pageError) {
+        pageError.textContent = 'Não foi possível carregar os planos neste momento. Tente novamente dentro de alguns minutos.';
+        pageError.classList.remove('hidden');
+      }
+      return;
+    }
+    if (loading) loading.classList.add('hidden');
+    if (pageLoading) pageLoading.classList.add('hidden');
+    if (pageError) pageError.classList.add('hidden');
+    if (list && document.getElementById('plan-picker-modal').classList.contains('is-open')) {
+      renderPlans(loadedPlans, list);
+      list.classList.remove('hidden');
+    }
+  }
   function getKey() {
     var key = sessionStorage.getItem('sizotech_registration_key');
     if (!key) {
@@ -98,10 +159,10 @@
     return key;
   }
   function resetForm() {
-    form.reset(); currentStep = 1; subdomainAvailable = false;
+    form.reset(); currentStep = 1; subdomainAvailable = false; submitting = false;
     form.querySelectorAll('.field-error').forEach(function (item) { item.textContent = ''; });
     form.querySelectorAll('.border-red-300, .bg-red-50\\/30').forEach(function (field) { field.classList.remove('border-red-300', 'bg-red-50/30'); });
-    document.getElementById('signup-message').className = 'hidden mt-5 rounded-lg px-4 py-3 text-sm';
+    showSignupMessage('', '');
     document.getElementById('subdomain-availability').textContent = '';
     syncOther(); updateAddressFields(); syncSubdomainState(); showStep(1);
   }
@@ -133,11 +194,18 @@
     return !!value('plan_code') && !!value('billing_cycle') && !!value('business_area') && searchableSelectionValid(form.elements.business_area) && (value('business_area') !== 'OTHER' || !!value('business_area_other'));
   }
   function updateNavigationState() {
-    var next = document.getElementById('signup-next'); var submit = document.getElementById('signup-submit');
-    var ready = stepIsReady(currentStep); var activeButton = currentStep === 3 ? submit : next;
-    activeButton.disabled = !ready;
-    activeButton.classList.toggle('cursor-not-allowed', !ready);
-    activeButton.classList.toggle('opacity-50', !ready);
+    var next = document.getElementById('signup-next');
+    var submit = document.getElementById('signup-submit');
+    if (currentStep === 3) {
+      submit.disabled = submitting;
+      submit.classList.toggle('cursor-not-allowed', submitting);
+      submit.classList.toggle('opacity-50', submitting);
+      return;
+    }
+    var ready = stepIsReady(currentStep);
+    next.disabled = !ready;
+    next.classList.toggle('cursor-not-allowed', !ready);
+    next.classList.toggle('opacity-50', !ready);
   }
   function fieldSlot(name) {
     if (name === 'business_area' && form.elements.business_area._searchInput) return { field: form.elements.business_area._searchInput, slot: form.elements.business_area.closest('label').querySelector('.field-error') };
@@ -300,7 +368,38 @@
       var button = article.querySelector('button'); article.dataset.planPrice = priceAmount.textContent + ' ' + (price.currency || 'MZN') + cycleDetails.period; article.dataset.planCycles = JSON.stringify(availableCycles); article.dataset.billingCycle = cardCycle; button.dataset.planCode = code; list.appendChild(article);
     });
   }
-  function loadPlans() { request('plans').then(function (r) { var plans = r.body.data || []; if (!r.response.ok || !plans.length) throw new Error(); loadedPlans = plans; document.getElementById('plans-loading').classList.add('hidden'); renderPlans(plans); var freeButton = document.getElementById('choose-free-plan'); if (freeButton) freeButton.disabled = !plans.some(function (plan) { return String(plan.code || '').toUpperCase() === 'FREE'; }); }).catch(function () { document.getElementById('plans-loading').classList.add('hidden'); var error = document.getElementById('plans-error'); error.textContent = 'Não foi possível carregar os planos neste momento. Tente novamente dentro de alguns minutos.'; error.classList.remove('hidden'); }); }
+  function loadPlans(force) {
+    if (!force && plansPromise) return plansPromise;
+    syncPlanPickerUi('loading');
+    plansPromise = request('plans').then(function (r) {
+      var plans = extractPlans(r.body);
+      if (!r.response.ok || !plans.length) throw new Error(r.body.message || 'plans_unavailable');
+      loadedPlans = plans;
+      document.getElementById('plans-loading').classList.add('hidden');
+      renderPlans(plans);
+      var freeButton = document.getElementById('choose-free-plan');
+      if (freeButton) freeButton.disabled = !plans.some(function (plan) { return String(plan.code || '').toUpperCase() === 'FREE'; });
+      syncPlanPickerUi('ready');
+      return plans;
+    }).catch(function () {
+      loadedPlans = [];
+      syncPlanPickerUi('error');
+      plansPromise = null;
+      return [];
+    });
+    return plansPromise;
+  }
+  function openPlanPicker() {
+    var picker = document.getElementById('plan-picker-modal');
+    picker.classList.add('is-open');
+    document.body.classList.add('modal-open');
+    if (loadedPlans.length) {
+      syncPlanPickerUi('ready');
+      return;
+    }
+    syncPlanPickerUi('loading');
+    loadPlans(true);
+  }
   function loadTypes() {
     request('registration-options').then(function (r) {
       var data = r.body.data || {}; var select = form.elements.company_type; select.textContent = '';
@@ -329,8 +428,13 @@
   function choosePlan(card) { var picker = document.getElementById('plan-picker-modal'); picker.classList.remove('is-open'); resetForm(); form.elements.plan_code.value = card.dataset.planCode; document.getElementById('signup-plan-summary').textContent = 'Plano escolhido *: ' + card.dataset.planName + ' — ' + card.dataset.planPrice; var cycle = form.elements.billing_cycle; cycle.textContent = ''; JSON.parse(card.dataset.planCycles || '["monthly"]').forEach(function (name) { var details = billingCycles[name]; cycle.add(new Option(details ? details.label : name, name, false, name === card.dataset.billingCycle)); }); cycle.value = card.dataset.billingCycle || 'monthly'; modal.classList.add('is-open'); document.body.classList.add('modal-open'); }
   document.addEventListener('click', function (event) { var card = event.target.closest('.signup-plan-card'); if (card) choosePlan(card); });
   document.addEventListener('keydown', function (event) { var card = event.target.closest && event.target.closest('.signup-plan-card'); if (card && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); choosePlan(card); } });
-  document.querySelectorAll('[data-open-plan-picker]').forEach(function (button) { button.addEventListener('click', function () { var picker = document.getElementById('plan-picker-modal'); var list = document.getElementById('plan-picker-list'); if (loadedPlans.length) { renderPlans(loadedPlans, list); list.classList.remove('hidden'); document.getElementById('plan-picker-loading').classList.add('hidden'); } else { list.classList.add('hidden'); document.getElementById('plan-picker-loading').classList.remove('hidden'); } picker.classList.add('is-open'); document.body.classList.add('modal-open'); }); });
-  document.getElementById('choose-free-plan').addEventListener('click', function () { var freeCard = document.querySelector('#plans-list .signup-plan-card[data-plan-code="FREE"]'); if (freeCard) choosePlan(freeCard); });
+  document.querySelectorAll('[data-open-plan-picker]').forEach(function (button) { button.addEventListener('click', openPlanPicker); });
+  document.getElementById('choose-free-plan').addEventListener('click', function () { var freeCard = document.querySelector('#plans-list .signup-plan-card[data-plan-code="FREE"]'); if (freeCard) choosePlan(freeCard); else openPlanPicker(); });
+  document.addEventListener('click', function (event) {
+    if (!event.target.closest('[data-retry-plans]')) return;
+    event.preventDefault();
+    loadPlans(true);
+  });
   document.querySelectorAll('[data-billing-cycle]').forEach(function (button) { button.addEventListener('click', function () { selectedBillingCycle = button.dataset.billingCycle; document.querySelectorAll('[data-billing-cycle]').forEach(function (item) { var active = item === button; item.setAttribute('aria-pressed', active ? 'true' : 'false'); item.className = active ? 'rounded-lg bg-slate-950 px-4 py-2 text-sm font-semibold text-white shadow-sm' : 'rounded-lg px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-white hover:text-slate-950'; }); if (loadedPlans.length) renderPlans(loadedPlans); }); });
   document.querySelectorAll('[data-close-plan-picker]').forEach(function (button) { button.addEventListener('click', function () { document.getElementById('plan-picker-modal').classList.remove('is-open'); document.body.classList.remove('modal-open'); }); });
   document.querySelectorAll('[data-signup-close]').forEach(function (button) { button.addEventListener('click', function () { modal.classList.remove('is-open'); document.body.classList.remove('modal-open'); resetForm(); }); });
@@ -369,7 +473,103 @@
   });
   document.getElementById('signup-next').addEventListener('click', function () { if (validateStep(currentStep)) showStep(currentStep + 1); });
   document.getElementById('signup-back').addEventListener('click', function () { showStep(currentStep - 1); });
-  form.addEventListener('submit', function (event) { event.preventDefault(); if (!validateStep(3)) return; var button = document.getElementById('signup-submit'); button.disabled = true; button.textContent = 'A processar…'; var data = {}; new FormData(form).forEach(function (value, key) { data[key] = value; }); data.show_legal_designation = form.elements.show_legal_designation.checked; request('registrations', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf, 'Idempotency-Key': getKey() }, body: JSON.stringify(data) }).then(function (r) { button.disabled = false; button.textContent = 'Concluir cadastro'; if (r.response.status === 202 && r.body.provisioning_id) { localStorage.setItem('sizotech_provisioning_id', String(r.body.provisioning_id)); modal.classList.remove('is-open'); document.body.classList.remove('modal-open'); progressModal.classList.add('is-open'); updateProgress(r.body); monitor(r.body.provisioning_id); return; } if (r.body.errors) { showErrors(r.body.errors); return; } var message = document.getElementById('signup-message'); message.textContent = r.body.message || 'Não foi possível concluir o cadastro neste momento.'; message.className = 'mt-5 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700'; }).catch(function () { button.disabled = false; button.textContent = 'Concluir cadastro'; }); });
-  var pending = localStorage.getItem('sizotech_provisioning_id'); if (pending) { progressModal.classList.add('is-open'); monitor(pending); }
+  form.addEventListener('submit', function (event) {
+    event.preventDefault();
+    if (submitting) return;
+    showSignupMessage('', '');
+    syncAddressProvince();
+    if (!validateStep(3)) {
+      showSignupMessage('Verifique os campos assinalados antes de concluir o cadastro.', 'error');
+      return;
+    }
+    var button = document.getElementById('signup-submit');
+    submitting = true;
+    button.disabled = true;
+    button.textContent = 'A processar…';
+    updateNavigationState();
+
+    var data = {
+      name: String(form.elements.name.value || '').trim(),
+      company_type: String(form.elements.company_type.value || '').trim(),
+      company_type_other: String(form.elements.company_type_other.value || '').trim(),
+      show_legal_designation: !!form.elements.show_legal_designation.checked,
+      email: String(form.elements.email.value || '').trim(),
+      nuit: nuitDigits(form.elements.nuit.value),
+      phone: String(form.elements.phone.value || '').trim(),
+      phone_alt: String(form.elements.phone_alt.value || '').trim(),
+      business_area: String(form.elements.business_area.value || '').trim(),
+      business_area_other: String(form.elements.business_area_other.value || '').trim(),
+      address_country: String(form.elements.address_country.value || '').trim(),
+      address_province: String(form.elements.address_province.value || '').trim(),
+      address_street: String(form.elements.address_street.value || '').trim(),
+      address_neighborhood: String(form.elements.address_neighborhood.value || '').trim(),
+      address_house_number: String(form.elements.address_house_number.value || '').trim(),
+      plan_code: String(form.elements.plan_code.value || '').trim(),
+      billing_cycle: String(form.elements.billing_cycle.value || '').trim(),
+      subdomain: String(form.elements.subdomain.value || '').trim().toLowerCase()
+    };
+
+    request('registrations', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': currentCsrf(),
+        'Idempotency-Key': getKey()
+      },
+      body: JSON.stringify(data)
+    }).then(function (r) {
+      submitting = false;
+      button.disabled = false;
+      button.textContent = 'Concluir cadastro';
+      updateNavigationState();
+
+      var body = r.body || {};
+      var provisioningId = body.provisioning_id || (body.data && body.data.provisioning_id);
+      if ((r.response.status === 202 || r.response.status === 201) && provisioningId) {
+        localStorage.setItem('sizotech_provisioning_id', String(provisioningId));
+        modal.classList.remove('is-open');
+        document.body.classList.remove('modal-open');
+        progressModal.classList.add('is-open');
+        document.body.classList.add('modal-open');
+        updateProgress(body.data || body);
+        monitor(provisioningId);
+        return;
+      }
+      if (r.response.status === 201 || r.response.ok) {
+        var result = body.company || (body.data && body.data.company) || body.data || body;
+        modal.classList.remove('is-open');
+        progressModal.classList.add('is-open');
+        document.body.classList.add('modal-open');
+        document.getElementById('signup-progress-message').textContent = body.message || 'Cadastro concluído com sucesso.';
+        var box = document.getElementById('signup-progress-result');
+        box.innerHTML = '';
+        box.className = 'mt-7 rounded-xl bg-emerald-50 px-4 py-4 text-sm text-emerald-900';
+        box.textContent = 'A empresa foi criada. ';
+        if (result && result.access_url) {
+          var link = document.createElement('a');
+          link.href = result.access_url;
+          link.className = 'font-semibold underline';
+          link.textContent = 'Aceder ao sistema';
+          box.appendChild(link);
+        }
+        box.classList.remove('hidden');
+        sessionStorage.removeItem('sizotech_registration_key');
+        return;
+      }
+      if (body.errors) {
+        showErrors(body.errors);
+        showSignupMessage(body.message || 'Existem erros nos dados enviados. Corrija e tente novamente.', 'error');
+        return;
+      }
+      showSignupMessage(body.message || 'Não foi possível concluir o cadastro neste momento. Tente novamente.', 'error');
+    }).catch(function () {
+      submitting = false;
+      button.disabled = false;
+      button.textContent = 'Concluir cadastro';
+      updateNavigationState();
+      showSignupMessage('Não foi possível comunicar com o servidor. Verifique a ligação e tente novamente.', 'error');
+    });
+  });
+  var pending = localStorage.getItem('sizotech_provisioning_id'); if (pending) { progressModal.classList.add('is-open'); document.body.classList.add('modal-open'); monitor(pending); }
   updateNavigationState(); loadPlans(); loadTypes();
 })();

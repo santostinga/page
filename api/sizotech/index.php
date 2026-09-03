@@ -79,9 +79,9 @@ try {
         if (!sizo_api_csrf_valid()) {
             sizo_api_reply(403, ['status' => 'invalid_request', 'message' => 'Pedido inválido. Atualize a página e tente novamente.']);
         }
-        $key = trim((string) ($_SERVER['HTTP_IDEMPOTENCY_KEY'] ?? ''));
+        $key = trim((string) ($_SERVER['HTTP_IDEMPOTENCY_KEY'] ?? $_SERVER['HTTP_X_IDEMPOTENCY_KEY'] ?? ''));
         if (!preg_match('/^signup-[A-Za-z0-9-]{16,120}$/', $key)) {
-            sizo_api_reply(422, ['status' => 'validation_error', 'message' => 'Não foi possível validar o pedido.']);
+            sizo_api_reply(422, ['status' => 'validation_error', 'message' => 'Não foi possível validar o pedido. Atualize a página e tente novamente.']);
         }
         $input = json_decode((string) file_get_contents('php://input'), true);
         if (!is_array($input)) {
@@ -95,8 +95,12 @@ try {
         $payload['show_legal_designation'] = !empty($input['show_legal_designation']);
         $result = $client->request('POST', '/registrations', $payload, $key);
         $body = $result['body'];
-        if ($result['status'] === 202 && !empty($body['provisioning_id'])) {
-            $_SESSION['signup_provisionings'][(int) $body['provisioning_id']] = $key;
+        $provisioningId = (int) ($body['provisioning_id'] ?? ($body['data']['provisioning_id'] ?? 0));
+        if (in_array($result['status'], [201, 202], true) && $provisioningId > 0) {
+            $_SESSION['signup_provisionings'][$provisioningId] = $key;
+            if (empty($body['provisioning_id'])) {
+                $body['provisioning_id'] = $provisioningId;
+            }
         }
         sizo_api_reply($result['status'], $body);
     }
