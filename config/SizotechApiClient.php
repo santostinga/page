@@ -22,8 +22,9 @@ final class SizotechApiClient
         return $this->baseUrl !== '/api/v1' && $this->apiKey !== '';
     }
 
-    /** @return array{status:int,body:array<string,mixed>} */
-    public function request(string $method, string $path, ?array $payload = null, ?string $idempotencyKey = null): array
+    /** @param array<string,string>|null $extraHeaders
+     *  @return array{status:int,body:array<string,mixed>} */
+    public function request(string $method, string $path, ?array $payload = null, ?string $idempotencyKey = null, ?array $extraHeaders = null): array
     {
         if (!$this->isConfigured() || !function_exists('curl_init')) {
             throw new RuntimeException('Não foi possível comunicar com o Sizotech.');
@@ -35,6 +36,16 @@ final class SizotechApiClient
         }
         if ($idempotencyKey !== null) {
             $headers[] = 'Idempotency-Key: ' . $idempotencyKey;
+        }
+        if (is_array($extraHeaders)) {
+            foreach ($extraHeaders as $name => $value) {
+                $name = trim((string) $name);
+                $value = trim((string) $value);
+                if ($name === '' || $value === '') {
+                    continue;
+                }
+                $headers[] = $name . ': ' . $value;
+            }
         }
 
         $curl = curl_init($this->baseUrl . '/' . ltrim($path, '/'));

@@ -24,6 +24,16 @@ function sizo_api_csrf_valid(): bool
     return $token !== '' && hash_equals((string) ($_SESSION['signup_csrf'] ?? ''), $token);
 }
 
+function sizo_prod_test_headers(): array
+{
+    $token = trim((string) ($_COOKIE['sizo_prod_test'] ?? ''));
+    if ($token === '') {
+        return [];
+    }
+
+    return ['X-Sizo-Prod-Test' => $token];
+}
+
 $route = trim((string) ($_GET['route'] ?? ''), '/');
 $method = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
 $client = new SizotechApiClient();
@@ -34,7 +44,11 @@ try {
         sizo_api_reply($result['status'], $result['body']);
     }
     if ($method === 'GET' && $route === 'registration-options') {
-        $result = $client->request('GET', '/registration-options');
+        $result = $client->request('GET', '/registration-options', null, null, sizo_prod_test_headers());
+        sizo_api_reply($result['status'], $result['body']);
+    }
+    if ($method === 'GET' && $route === 'registrations/test-mode') {
+        $result = $client->request('GET', '/registrations/test-mode', null, null, sizo_prod_test_headers());
         sizo_api_reply($result['status'], $result['body']);
     }
     if ($method === 'GET' && $route === 'companies') {
@@ -140,7 +154,11 @@ try {
             $payload[$field] = is_bool($input[$field] ?? null) ? $input[$field] : trim((string) ($input[$field] ?? ''));
         }
         $payload['show_legal_designation'] = !empty($input['show_legal_designation']);
-        $result = $client->request('POST', '/registrations', $payload, $key);
+        $testToken = trim((string) ($_COOKIE['sizo_prod_test'] ?? ''));
+        if ($testToken !== '') {
+            $payload['test_session_token'] = $testToken;
+        }
+        $result = $client->request('POST', '/registrations', $payload, $key, sizo_prod_test_headers());
         $body = $result['body'];
         $provisioningId = (int) ($body['provisioning_id'] ?? ($body['data']['provisioning_id'] ?? 0));
         if (in_array($result['status'], [201, 202], true) && $provisioningId > 0) {

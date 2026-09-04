@@ -820,7 +820,18 @@
       (data.business_areas || []).forEach(function (area) { var option = new Option(area.label, area.value); option.dataset.requiresOther = area.requires_other ? '1' : '0'; businessSelect.add(option); });
       setupSearchableSelect(businessSelect, 'Pesquisar área de actividade…');
       syncOther(); syncBusinessArea();
+      updateTestModeLabel(!!data.production_test_mode);
     }).catch(function () { form.elements.company_type.innerHTML = '<option value="">Não foi possível carregar os tipos</option>'; form.elements.business_area.innerHTML = '<option value="">Não foi possível carregar as áreas</option>'; syncBusinessArea(); });
+  }
+  function updateTestModeLabel(active) {
+    var label = document.getElementById('signup-subscription-label');
+    if (label) {
+      label.textContent = active ? 'Subscrição · Modo de teste activado' : 'Subscrição';
+    }
+    var notice = document.getElementById('signup-test-mode-notice');
+    if (notice) {
+      notice.classList.toggle('hidden', !active);
+    }
   }
   function setAvailability(ok, text) { subdomainAvailable = ok; var out = document.getElementById('subdomain-availability'); out.textContent = text; out.className = 'mt-1 block text-xs ' + (ok ? 'text-emerald-600' : 'text-red-600'); updateNavigationState(); }
   function checkSubdomain() { var value = String(form.elements.subdomain.value || '').trim().toLowerCase(); form.elements.subdomain.value = value; if (!/^[a-z0-9-]+$/.test(value)) { setAvailability(false, value ? 'Use apenas letras minúsculas, números e hífen.' : ''); return Promise.resolve(false); } return request('subdomains/check?subdomain=' + encodeURIComponent(value)).then(function (r) { var data = r.body.data || {}; var ok = r.response.ok && !!data.valid && !!data.available; setAvailability(ok, ok ? 'Endereço disponível.' : 'Este endereço não está disponível.'); return ok; }).catch(function () { setAvailability(false, 'Não foi possível verificar o endereço.'); return false; }); }
