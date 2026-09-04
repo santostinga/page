@@ -825,13 +825,10 @@
   }
   function updateTestModeLabel(active) {
     var label = document.getElementById('signup-subscription-label');
-    if (label) {
-      label.textContent = active ? 'Subscrição · Modo de teste activado' : 'Subscrição';
-    }
-    var notice = document.getElementById('signup-test-mode-notice');
-    if (notice) {
-      notice.classList.toggle('hidden', !active);
-    }
+    if (!label) return;
+    label.textContent = active ? 'Subscrição · Modo de teste activado' : 'Subscrição';
+    label.classList.toggle('text-brand', !active);
+    label.classList.toggle('text-red-600', !!active);
   }
   function setAvailability(ok, text) { subdomainAvailable = ok; var out = document.getElementById('subdomain-availability'); out.textContent = text; out.className = 'mt-1 block text-xs ' + (ok ? 'text-emerald-600' : 'text-red-600'); updateNavigationState(); }
   function checkSubdomain() { var value = String(form.elements.subdomain.value || '').trim().toLowerCase(); form.elements.subdomain.value = value; if (!/^[a-z0-9-]+$/.test(value)) { setAvailability(false, value ? 'Use apenas letras minúsculas, números e hífen.' : ''); return Promise.resolve(false); } return request('subdomains/check?subdomain=' + encodeURIComponent(value)).then(function (r) { var data = r.body.data || {}; var ok = r.response.ok && !!data.valid && !!data.available; setAvailability(ok, ok ? 'Endereço disponível.' : 'Este endereço não está disponível.'); return ok; }).catch(function () { setAvailability(false, 'Não foi possível verificar o endereço.'); return false; }); }
