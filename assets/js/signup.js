@@ -201,6 +201,9 @@
     void target.offsetWidth;
     target.classList.add('is-open');
     document.body.classList.add('modal-open');
+    if (target === modal) {
+      refreshTestModeLabel();
+    }
   }
   function switchModal(from, to, onDone) {
     if (!to) {
@@ -212,6 +215,9 @@
       void to.offsetWidth;
       to.classList.add('is-open');
       document.body.classList.add('modal-open');
+      if (to === modal) {
+        refreshTestModeLabel();
+      }
       if (onDone) onDone();
     };
     if (!from || from.classList.contains('hidden')) {
@@ -829,6 +835,11 @@
     label.textContent = active ? 'Subscrição · Modo de teste activado' : 'Subscrição';
     label.classList.toggle('text-brand', !active);
     label.classList.toggle('text-red-600', !!active);
+  }
+  function refreshTestModeLabel() {
+    return request('registrations/test-mode').then(function (r) {
+      updateTestModeLabel(!!(r.body && r.body.active));
+    }).catch(function () {});
   }
   function setAvailability(ok, text) { subdomainAvailable = ok; var out = document.getElementById('subdomain-availability'); out.textContent = text; out.className = 'mt-1 block text-xs ' + (ok ? 'text-emerald-600' : 'text-red-600'); updateNavigationState(); }
   function checkSubdomain() { var value = String(form.elements.subdomain.value || '').trim().toLowerCase(); form.elements.subdomain.value = value; if (!/^[a-z0-9-]+$/.test(value)) { setAvailability(false, value ? 'Use apenas letras minúsculas, números e hífen.' : ''); return Promise.resolve(false); } return request('subdomains/check?subdomain=' + encodeURIComponent(value)).then(function (r) { var data = r.body.data || {}; var ok = r.response.ok && !!data.valid && !!data.available; setAvailability(ok, ok ? 'Endereço disponível.' : 'Este endereço não está disponível.'); return ok; }).catch(function () { setAvailability(false, 'Não foi possível verificar o endereço.'); return false; }); }
@@ -1563,7 +1574,14 @@
     }
     submitSignup();
   });
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible') {
+      refreshTestModeLabel();
+    }
+  });
+  window.addEventListener('focus', refreshTestModeLabel);
   closeAllModals();
   try { localStorage.removeItem('sizotech_provisioning_id'); } catch (e) {}
   updateNavigationState(); loadPlans(); loadTypes();
+  refreshTestModeLabel();
 })();

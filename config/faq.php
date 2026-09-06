@@ -29,7 +29,7 @@ return [
     ],
     [
         'pergunta' => 'Como peço uma demonstração?',
-        'resposta' => 'Clique em «Ver demonstração» ou «Solicitar demonstração», envie e-mail para info@sizotech.net ou fale pelo WhatsApp. Indique o sector e o plano que está a considerar.',
+        'resposta' => 'Clique em «Ver demonstração» ou «Solicitar demonstração», envie e-mail para contacto@sizotech.net ou fale pelo WhatsApp. Indique o sector e o plano que está a considerar.',
     ],
     [
         'pergunta' => 'Posso exportar documentos e relatórios?',

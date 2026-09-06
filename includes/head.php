@@ -24,9 +24,9 @@ $isPublicSite = (bool) preg_match('/^(www\.)?sizotech\.net$/', $host);
   <meta property="og:type" content="website">
   <meta property="og:title" content="<?= htmlspecialchars($pageTitle, ENT_QUOTES, 'UTF-8') ?>">
   <meta property="og:description" content="<?= htmlspecialchars($pageDesc, ENT_QUOTES, 'UTF-8') ?>">
-  <link rel="icon" type="image/png" sizes="256x256" href="<?= htmlspecialchars(sizo_asset('assets/img/favicon-transparent.png'), ENT_QUOTES, 'UTF-8') ?>">
-  <link rel="shortcut icon" type="image/png" href="<?= htmlspecialchars(sizo_asset('assets/img/favicon-transparent.png'), ENT_QUOTES, 'UTF-8') ?>">
-  <link rel="apple-touch-icon" sizes="256x256" href="<?= htmlspecialchars(sizo_asset('assets/img/favicon-transparent.png'), ENT_QUOTES, 'UTF-8') ?>">
+  <link rel="icon" type="image/png" href="<?= htmlspecialchars(sizo_asset('assets/img/fav.png'), ENT_QUOTES, 'UTF-8') ?>">
+  <link rel="shortcut icon" type="image/png" href="<?= htmlspecialchars(sizo_asset('assets/img/fav.png'), ENT_QUOTES, 'UTF-8') ?>">
+  <link rel="apple-touch-icon" href="<?= htmlspecialchars(sizo_asset('assets/img/fav.png'), ENT_QUOTES, 'UTF-8') ?>">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">

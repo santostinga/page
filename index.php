@@ -22,7 +22,7 @@ require __DIR__ . '/includes/head.php';
 
 <header id="site-nav" class="site-nav fixed top-0 left-0 right-0 z-50 w-full">
   <div class="relative flex w-full items-center justify-between gap-4 px-4 py-3.5 sm:px-6 lg:px-8 xl:px-10">
-    <a href="#inicio" class="flex shrink-0 items-center" aria-label="Sizo Software - início"><img src="assets/img/LOGO%20Sizotech.png" alt="Sizo Tech — Smart IT Solutions" class="h-10 w-auto object-contain sm:h-12" width="180" height="101"></a>
+    <a href="#inicio" class="flex shrink-0 items-center" aria-label="Sizo Software - início"><img src="<?= htmlspecialchars(sizo_asset('assets/img/LOGO ST.png'), ENT_QUOTES, 'UTF-8') ?>" alt="Sizotech — Smart It Solutions" class="h-9 w-auto object-contain sm:h-11" width="190" height="64"></a>
     <nav class="absolute left-1/2 hidden -translate-x-1/2 items-center gap-8 md:flex" aria-label="Principal">
       <a href="#sobre" class="text-sm font-medium text-slate-600 transition hover:text-slate-900">Sobre</a>
       <a href="#funcionalidades" class="text-sm font-medium text-slate-600 transition hover:text-slate-900">Funcionalidades</a>
@@ -234,7 +234,7 @@ require __DIR__ . '/includes/head.php';
 
 <footer class="border-t border-slate-200 bg-slate-50">
   <div class="w-full px-5 py-14 sm:px-8 lg:px-10 xl:px-12"><div class="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
-    <div class="sm:col-span-2 lg:col-span-1"><img src="assets/img/LOGO%20Sizotech.png" alt="Sizo Tech — Smart IT Solutions" class="h-14 w-auto object-contain" width="180" height="101"></div>
+    <div class="sm:col-span-2 lg:col-span-1"><img src="<?= htmlspecialchars(sizo_asset('assets/img/LOGO ST.png'), ENT_QUOTES, 'UTF-8') ?>" alt="Sizotech — Smart It Solutions" class="h-12 w-auto object-contain" width="190" height="64"></div>
     <div><h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">Produto</h3><ul class="mt-4 space-y-2.5 text-sm text-slate-600"><li><a href="#sobre" class="transition hover:text-slate-900">Sobre</a></li><li><a href="#funcionalidades" class="transition hover:text-slate-900">Funcionalidades</a></li><li><a href="#planos" class="transition hover:text-slate-900">Planos</a></li></ul></div>
     <div><h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">Legal</h3><ul class="mt-4 space-y-2.5 text-sm text-slate-600"><li><a href="#" class="transition hover:text-slate-900">Política de Privacidade</a></li><li><a href="#" class="transition hover:text-slate-900">Termos</a></li></ul></div>
     <div><h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">Contacto</h3><ul class="mt-4 space-y-2.5 text-sm text-slate-600"><li><a href="<?= htmlspecialchars($sizoMailtoBase, ENT_QUOTES, 'UTF-8') ?>" class="transition hover:text-slate-900"><?= htmlspecialchars($sizoContacto['email'], ENT_QUOTES, 'UTF-8') ?></a></li><li><a href="<?= htmlspecialchars($sizoWhatsAppUrl, ENT_QUOTES, 'UTF-8') ?>" class="transition hover:text-slate-900" target="_blank" rel="noopener noreferrer"><?= htmlspecialchars($sizoContacto['telefone_display'], ENT_QUOTES, 'UTF-8') ?></a></li></ul></div>

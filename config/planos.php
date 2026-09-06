@@ -4,7 +4,7 @@
  */
 return [
     'contacto' => [
-        'email' => 'info@sizotech.net',
+        'email' => 'contacto@sizotech.net',
         'telefone_display' => '+258 84 025 5253',
         'telefone_href' => 'tel:+258840255253',
         'whatsapp_url' => 'https://wa.me/258840255253?' . http_build_query([
