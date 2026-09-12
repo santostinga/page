@@ -867,11 +867,13 @@
   function updateNavigationState() {
     var next = document.getElementById('signup-next');
     var submit = document.getElementById('signup-submit');
-    next.disabled = false;
+    next.disabled = !!submitting;
     submit.disabled = submitting && currentStep === totalSteps;
-    next.classList.remove('cursor-not-allowed', 'opacity-50');
+    next.classList.toggle('cursor-not-allowed', !!submitting);
+    next.classList.toggle('opacity-70', !!submitting);
     submit.classList.remove('cursor-not-allowed', 'opacity-50');
-    next.style.pointerEvents = submitting && currentStep !== totalSteps ? 'none' : '';
+    // pointer-events via disabled is enough; avoid stuck inline styles
+    next.style.pointerEvents = '';
     submit.style.pointerEvents = submitting && currentStep === totalSteps ? 'none' : '';
   }
   function fieldSlot(name) {
@@ -1111,8 +1113,29 @@
     }).catch(function () { form.elements.company_type.innerHTML = '<option value="">Não foi possível carregar os tipos</option>'; form.elements.business_area.innerHTML = '<option value="">Não foi possível carregar as áreas</option>'; syncBusinessArea(); });
   }
   function setAvailability(ok, text) { subdomainAvailable = ok; var out = document.getElementById('subdomain-availability'); out.textContent = text; out.className = 'mt-1 block text-xs ' + (ok ? 'text-emerald-600' : 'text-red-600'); updateNavigationState(); saveSignupSession(); }
-  function checkSubdomain() { var value = String(form.elements.subdomain.value || '').trim().toLowerCase(); form.elements.subdomain.value = value; if (!/^[a-z0-9-]+$/.test(value)) { setAvailability(false, value ? 'Use apenas letras minúsculas, números e hífen.' : ''); return Promise.resolve(false); } return request('subdomains/check?subdomain=' + encodeURIComponent(value)).then(function (r) { var data = r.body.data || {}; var ok = r.response.ok && !!data.valid && !!data.available; setAvailability(ok, ok ? 'Endereço disponível.' : 'Este endereço não está disponível.'); return ok; }).catch(function () { setAvailability(false, 'Não foi possível verificar o endereço.'); return false; }); }
+  var subdomainCheckSeq = 0;
+  function checkSubdomain() {
+    var value = String(form.elements.subdomain.value || '').trim().toLowerCase();
+    form.elements.subdomain.value = value;
+    var seq = ++subdomainCheckSeq;
+    if (!/^[a-z0-9-]+$/.test(value)) {
+      setAvailability(false, value ? 'Use apenas letras minúsculas, números e hífen.' : '');
+      return Promise.resolve(false);
+    }
+    return request('subdomains/check?subdomain=' + encodeURIComponent(value)).then(function (r) {
+      if (seq !== subdomainCheckSeq) return false;
+      var data = r.body.data || {};
+      var ok = r.response.ok && !!data.valid && !!data.available;
+      setAvailability(ok, ok ? 'Endereço disponível.' : 'Este endereço não está disponível.');
+      return ok;
+    }).catch(function () {
+      if (seq !== subdomainCheckSeq) return false;
+      setAvailability(false, 'Não foi possível verificar o endereço.');
+      return false;
+    });
+  }
   function ensureSubdomainAvailable() {
+    clearTimeout(checkTimer);
     var value = String(form.elements.subdomain.value || '').trim().toLowerCase();
     if (!value) {
       setAvailability(false, '');
@@ -1607,8 +1630,22 @@
       email_verification_token: emailVerificationToken
     };
   }
-  function setActionBusy(busy) {
+  function setActionBusy(busy, options) {
     submitting = !!busy;
+    options = options || {};
+    var next = document.getElementById('signup-next');
+    if (next && options.nextLoading) {
+      if (busy) {
+        if (!next.dataset.label) next.dataset.label = next.textContent || 'Continuar';
+        next.innerHTML = '<span class="button-loader"></span>';
+      } else if (next.dataset.label) {
+        next.textContent = next.dataset.label;
+        delete next.dataset.label;
+      }
+    } else if (next && !busy && next.dataset.label) {
+      next.textContent = next.dataset.label;
+      delete next.dataset.label;
+    }
     updateNavigationState();
   }
   function validateStepWithApi(step) {
@@ -1616,14 +1653,17 @@
     if (!validateStep(step)) return Promise.resolve(false);
     var apiStep = formApiStep(step);
     if (!apiStep) return Promise.resolve(true);
-    setActionBusy(true);
+    setActionBusy(true, { nextLoading: true });
     return request('registrations/validate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': currentCsrf() },
       body: JSON.stringify(Object.assign({ step: apiStep }, formPayload()))
     }).then(function (r) {
       var body = r.body || {};
-      if (r.response.ok && body.status === 'ok') return true;
+      if (r.response.ok && body.status === 'ok') {
+        setActionBusy(false);
+        return true;
+      }
       setActionBusy(false);
       if (body.errors) {
         showErrors(body.errors);
@@ -1724,24 +1764,50 @@
 
     if (currentStep === 1) {
       showSignupMessage('', '');
-      setActionBusy(true);
+      // Se falha noutros campos (NUIT, email, etc.), mostra erros já —
+      // só segue para a API quando o único bloqueio é o subdomínio a verificar.
+      if (!validateStep(1) && !onlySubdomainBlocking()) return;
+      setActionBusy(true, { nextLoading: true });
       ensureSubdomainAvailable().then(function (subOk) {
-        setActionBusy(false);
-        if (!subOk || !validateStep(1)) return;
+        if (!subOk || !validateStep(1)) {
+          setActionBusy(false);
+          return;
+        }
         if (isCurrentEmailVerified()) {
+          setActionBusy(false);
           showStep(2);
           return;
         }
-        beginEmailVerificationFlow(false);
+        setActionBusy(false);
+        return beginEmailVerificationFlow(false);
+      }).catch(function () {
+        setActionBusy(false);
+        showSignupMessage('Não foi possível continuar. Verifique a ligação e tente novamente.', 'error');
       });
       return;
     }
 
     validateStepWithApi(currentStep).then(function (ok) {
       if (!ok) return;
-      submitting = false;
+      setActionBusy(false);
       showStep(currentStep + 1);
+    }).catch(function () {
+      setActionBusy(false);
+      showSignupMessage('Não foi possível continuar. Verifique a ligação e tente novamente.', 'error');
     });
+  }
+  function onlySubdomainBlocking() {
+    var value = function (name) {
+      var raw = String(form.elements[name] ? form.elements[name].value : '').trim();
+      return name === 'nuit' ? nuitDigits(raw) : raw;
+    };
+    if (value('name').replace(/[^\p{L}\p{N}]/gu, '').length < 2) return false;
+    if (!value('company_type')) return false;
+    if (value('company_type') === 'OTHER' && !value('company_type_other')) return false;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value('email'))) return false;
+    if (!/^\d{9}$/.test(value('nuit'))) return false;
+    if (!/^[a-z0-9-]+$/.test(value('subdomain'))) return false;
+    return !subdomainAvailable;
   }
   function handleSignupEnter(event) {
     if (!isEnterKey(event) || event.isComposing) return;
