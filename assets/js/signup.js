@@ -3,7 +3,7 @@
 
   var api = 'api/sizotech/';
   var form = document.getElementById('signup-form');
-  var modal = document.getElementById('signup-modal');
+  var modal = document.getElementById('signup-view');
   var progressModal = document.getElementById('signup-progress-modal');
   var verificationModal = document.getElementById('email-verification-modal');
   var verificationForm = document.getElementById('email-verification-form');
@@ -29,7 +29,10 @@
   var emailCodeSentFor = '';
   var emailVerificationPending = false;
   var resendCooldownTimer = null;
-  var pickerModal = document.getElementById('plan-picker-modal');
+  var otpAutoSubmitTimer = null;
+  var otpManualConfirmAllowed = false;
+  var otpConfirmProcessing = false;
+  var pickerModal = null;
   var otpInputs = Array.prototype.slice.call(verificationModal.querySelectorAll('.otp-input'));
   var confirmButton = document.getElementById('confirmButton');
   var fieldSteps = { name: 1, company_type: 1, company_type_other: 1, email: 1, nuit: 1, subdomain: 1, phone: 2, phone_alt: 2, address_country: 2, address_province: 2, address_street: 2, address_neighborhood: 2, address_house_number: 2, business_area: 3, business_area_other: 3, plan_code: 3, billing_cycle: 3 };
@@ -120,7 +123,16 @@
     });
   }
   function currentCsrf() {
+    var fromAttr = (form.getAttribute('data-csrf') || '').trim();
+    if (fromAttr) {
+      if (form.elements.csrf) form.elements.csrf.value = fromAttr;
+      return fromAttr;
+    }
     return (form.elements.csrf && form.elements.csrf.value) || '';
+  }
+  function syncFreshCsrf() {
+    var fresh = (form.getAttribute('data-csrf') || '').trim();
+    if (fresh && form.elements.csrf) form.elements.csrf.value = fresh;
   }
   var modalCloseTimer = null;
   function hideModalInstant(el) {
@@ -156,7 +168,187 @@
     el.addEventListener('transitionend', onEnd);
     setTimeout(finish, 340);
   }
-  function closeAllModals(options) {
+  function isSignupOpen() {
+    return !!(modal && modal.classList.contains('is-open'));
+  }
+  var SIGNUP_SESSION_KEY = 'sizotech_signup_session';
+  function readSignupSession() {
+    try {
+      var raw = sessionStorage.getItem(SIGNUP_SESSION_KEY);
+      if (!raw) return null;
+      var data = JSON.parse(raw);
+      return data && typeof data === 'object' ? data : null;
+    } catch (e) {
+      return null;
+    }
+  }
+  function clearSignupSession() {
+    try { sessionStorage.removeItem(SIGNUP_SESSION_KEY); } catch (e) {}
+  }
+  function saveSignupSession() {
+    if (!isSignupOpen() && window.location.hash !== '#cadastro') return;
+    try {
+      var fields = {};
+      Array.prototype.forEach.call(form.elements, function (el) {
+        if (!el.name || el.name === 'csrf' || el.type === 'submit' || el.type === 'button') return;
+        if (el.type === 'checkbox') {
+          fields[el.name] = !!el.checked;
+          return;
+        }
+        if (el.type === 'radio') {
+          if (el.checked) fields[el.name] = el.value;
+          return;
+        }
+        fields[el.name] = el.value;
+      });
+      var prev = readSignupSession() || {};
+      sessionStorage.setItem(SIGNUP_SESSION_KEY, JSON.stringify({
+        active: true,
+        plan_code: String(form.elements.plan_code.value || prev.plan_code || ''),
+        plan_name: String(prev.plan_name || ''),
+        monthly_label: String(prev.monthly_label || ''),
+        plan_cycles: prev.plan_cycles || '["monthly"]',
+        billing_cycle: String(form.elements.billing_cycle.value || prev.billing_cycle || 'monthly'),
+        step: currentStep,
+        subdomain_available: !!subdomainAvailable,
+        email_verified_for: emailVerifiedFor || '',
+        email_verification_token: emailVerificationToken || '',
+        email_code_sent_for: emailCodeSentFor || '',
+        fields: fields
+      }));
+    } catch (e) {}
+  }
+  function rememberPlanMeta(meta) {
+    var prev = readSignupSession() || {};
+    try {
+      sessionStorage.setItem(SIGNUP_SESSION_KEY, JSON.stringify(Object.assign({}, prev, {
+        active: true,
+        plan_code: meta.plan_code || prev.plan_code || '',
+        plan_name: meta.plan_name || prev.plan_name || '',
+        monthly_label: meta.monthly_label || prev.monthly_label || '',
+        plan_cycles: meta.plan_cycles || prev.plan_cycles || '["monthly"]',
+        billing_cycle: meta.billing_cycle || prev.billing_cycle || 'monthly'
+      })));
+    } catch (e) {}
+  }
+  function applySignupSession(data) {
+    if (!data) return;
+    var planCode = String(data.plan_code || 'FREE');
+    var planName = String(data.plan_name || planCode);
+    var monthlyLabel = String(data.monthly_label || '');
+    var planCycles = data.plan_cycles || '["monthly"]';
+    var cardCycle = String(data.billing_cycle || 'monthly');
+    form.elements.plan_code.value = planCode;
+    setPlanSummary(planName, monthlyLabel);
+    var cycle = form.elements.billing_cycle;
+    cycle.textContent = '';
+    try {
+      JSON.parse(planCycles).forEach(function (name) {
+        var details = billingCycles[name];
+        cycle.add(new Option(details ? details.label : name, name, false, name === cardCycle));
+      });
+    } catch (e) {
+      cycle.add(new Option('Mensal', 'monthly', true, true));
+    }
+    cycle.value = cardCycle;
+    syncBillingCycleVisibility();
+    var fields = data.fields || {};
+    Object.keys(fields).forEach(function (name) {
+      if (name === 'csrf') return;
+      var el = form.elements[name];
+      if (!el) return;
+      if (el.type === 'checkbox') {
+        el.checked = !!fields[name];
+        return;
+      }
+      el.value = fields[name] == null ? '' : String(fields[name]);
+    });
+    syncFreshCsrf();
+    try {
+      if (form.elements.phone_national) form.elements.phone_national.dispatchEvent(new Event('input'));
+      if (form.elements.phone_alt_national) form.elements.phone_alt_national.dispatchEvent(new Event('input'));
+    } catch (e) {}
+    syncOther();
+    updateAddressFields();
+    syncSubdomainState();
+    syncBusinessArea();
+    try {
+      syncSearchableSelect(form.elements.address_country, true);
+      syncSearchableSelect(form.elements.address_province_mz, true);
+      syncSearchableSelect(form.elements.business_area, true);
+    } catch (e) {}
+    updateCompanyNamePreview();
+    updatePlanTotalBadge();
+    showStep(Math.min(Math.max(Number(data.step) || 1, 1), totalSteps));
+    syncFreshCsrf();
+    emailVerifiedFor = String(data.email_verified_for || '').trim().toLowerCase();
+    emailVerificationToken = String(data.email_verification_token || '');
+    emailCodeSentFor = String(data.email_code_sent_for || '').trim().toLowerCase();
+    if (String(form.elements.subdomain.value || '').trim()) {
+      checkSubdomain();
+    } else {
+      subdomainAvailable = !!data.subdomain_available;
+    }
+  }
+  function clearSignupBoot() {
+    try { document.documentElement.classList.remove('signup-boot'); } catch (e) {}
+  }
+  function enterSignupView() {
+    closeAllOverlays();
+    modal.classList.remove('hidden');
+    modal.classList.add('is-open');
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('signup-active');
+    document.body.classList.remove('modal-open');
+    clearSignupBoot();
+    try {
+      if (window.location.hash !== '#cadastro') {
+        history.pushState({ signup: true }, '', '#cadastro');
+      } else {
+        history.replaceState({ signup: true }, '', '#cadastro');
+      }
+    } catch (e) {}
+    saveSignupSession();
+    window.scrollTo(0, 0);
+  }
+  function leaveSignupView(options) {
+    options = options || {};
+    closeAllOverlays();
+    modal.classList.add('hidden');
+    modal.classList.remove('is-open');
+    modal.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('signup-active', 'modal-open');
+    clearSignupBoot();
+    if (options.reset !== false) {
+      resetForm();
+      clearSignupSession();
+    }
+    try {
+      if (window.location.hash === '#cadastro') {
+        history.replaceState({}, '', window.location.pathname + window.location.search);
+      }
+    } catch (e) {}
+    if (options.onDone) options.onDone();
+  }
+  function bootstrapSignupView() {
+    var session = readSignupSession();
+    var wantSignup = window.location.hash === '#cadastro' || !!(session && session.active);
+    if (!wantSignup) {
+      clearSignupBoot();
+      modal.classList.add('hidden');
+      modal.classList.remove('is-open');
+      modal.setAttribute('aria-hidden', 'true');
+      document.body.classList.remove('signup-active', 'modal-open');
+      return;
+    }
+    if (session && (session.plan_code || session.fields)) {
+      applySignupSession(session);
+      enterSignupView();
+      return;
+    }
+    startFreeSignup();
+  }
+  function closeAllOverlays(options) {
     var animate = !!(options && options.animate);
     var onDone = options && options.onDone;
     if (monitorTimer) {
@@ -168,7 +360,7 @@
       clearTimeout(modalCloseTimer);
       modalCloseTimer = null;
     }
-    var list = [pickerModal, modal, verificationModal, progressModal].filter(Boolean);
+    var list = [verificationModal, progressModal].filter(Boolean);
     if (!animate) {
       list.forEach(hideModalInstant);
       document.body.classList.remove('modal-open');
@@ -194,16 +386,23 @@
       });
     });
   }
+  function closeAllModals(options) {
+    leaveSignupView({
+      reset: !!(options && options.onDone),
+      onDone: options && options.onDone
+    });
+  }
   function openModal(target) {
-    closeAllModals();
     if (!target) return;
+    if (target === modal) {
+      enterSignupView();
+      return;
+    }
+    closeAllOverlays();
     target.classList.remove('hidden', 'is-closing');
     void target.offsetWidth;
     target.classList.add('is-open');
     document.body.classList.add('modal-open');
-    if (target === modal) {
-      refreshTestModeLabel();
-    }
   }
   function switchModal(from, to, onDone) {
     if (!to) {
@@ -211,16 +410,18 @@
       return;
     }
     var finish = function () {
+      if (to === modal) {
+        enterSignupView();
+        if (onDone) onDone();
+        return;
+      }
       to.classList.remove('hidden', 'is-closing');
       void to.offsetWidth;
       to.classList.add('is-open');
       document.body.classList.add('modal-open');
-      if (to === modal) {
-        refreshTestModeLabel();
-      }
       if (onDone) onDone();
     };
-    if (!from || from.classList.contains('hidden')) {
+    if (!from || from === modal || from.classList.contains('hidden')) {
       finish();
       return;
     }
@@ -245,23 +446,14 @@
     return [];
   }
   function syncPlanPickerUi(state) {
-    var loading = document.getElementById('plan-picker-loading');
-    var list = document.getElementById('plan-picker-list');
     var pageLoading = document.getElementById('plans-loading');
     var pageError = document.getElementById('plans-error');
     if (state === 'loading') {
-      if (loading) { loading.textContent = 'A carregar planos…'; loading.classList.remove('hidden'); }
-      if (list) list.classList.add('hidden');
       if (pageLoading) pageLoading.classList.remove('hidden');
       if (pageError) pageError.classList.add('hidden');
       return;
     }
     if (state === 'error') {
-      if (loading) {
-        loading.innerHTML = 'Não foi possível carregar os planos. <button type="button" data-retry-plans class="ml-1 font-semibold text-brand underline">Tentar novamente</button>';
-        loading.classList.remove('hidden');
-      }
-      if (list) list.classList.add('hidden');
       if (pageLoading) pageLoading.classList.add('hidden');
       if (pageError) {
         pageError.textContent = 'Não foi possível carregar os planos neste momento. Tente novamente dentro de alguns minutos.';
@@ -269,13 +461,37 @@
       }
       return;
     }
-    if (loading) loading.classList.add('hidden');
     if (pageLoading) pageLoading.classList.add('hidden');
     if (pageError) pageError.classList.add('hidden');
-    if (list && document.getElementById('plan-picker-modal').classList.contains('is-open')) {
-      renderPlans(loadedPlans, list);
-      list.classList.remove('hidden');
+  }
+  function startFreeSignup() {
+    var freeCard = document.querySelector('#plans-list .signup-plan-card[data-plan-code="FREE"]');
+    if (freeCard) {
+      choosePlan(freeCard);
+      return;
     }
+    loadPlans(true).then(function () {
+      var card = document.querySelector('#plans-list .signup-plan-card[data-plan-code="FREE"]');
+      if (card) {
+        choosePlan(card);
+        return;
+      }
+      resetForm();
+      form.elements.plan_code.value = 'FREE';
+      setPlanSummary('FREE', '0,00 MZN/mês');
+      var cycle = form.elements.billing_cycle;
+      cycle.textContent = '';
+      cycle.add(new Option('Mensal', 'monthly', true, true));
+      syncBillingCycleVisibility();
+      rememberPlanMeta({
+        plan_code: 'FREE',
+        plan_name: 'FREE',
+        monthly_label: '0,00 MZN/mês',
+        plan_cycles: '["monthly"]',
+        billing_cycle: 'monthly'
+      });
+      enterSignupView();
+    });
   }
   function getKey() {
     var key = sessionStorage.getItem('sizotech_registration_key');
@@ -314,6 +530,9 @@
     return 0;
   }
   function clearOtpInputs() {
+    clearOtpAutoSubmit();
+    otpManualConfirmAllowed = false;
+    setOtpConfirmProcessing(false);
     otpInputs.forEach(function (input) {
       input.value = '';
       input.classList.remove('error');
@@ -330,9 +549,51 @@
     otpInputs.forEach(function (input) { digits += String(input.value || '').replace(/\D/g, ''); });
     return digits.slice(0, 4);
   }
+  function clearOtpAutoSubmit() {
+    if (otpAutoSubmitTimer) {
+      clearTimeout(otpAutoSubmitTimer);
+      otpAutoSubmitTimer = null;
+    }
+  }
+  function setOtpConfirmProcessing(processing) {
+    otpConfirmProcessing = !!processing;
+    if (!confirmButton) return;
+    if (otpConfirmProcessing) {
+      confirmButton.disabled = true;
+      confirmButton.innerHTML = '<span class="button-loader"></span>';
+      return;
+    }
+    confirmButton.innerHTML = 'Confirmar código';
+    updateConfirmButton();
+  }
   function updateConfirmButton() {
     if (!confirmButton) return;
-    confirmButton.disabled = otpCode().length !== 4 || submitting;
+    if (otpConfirmProcessing || submitting) {
+      confirmButton.disabled = true;
+      return;
+    }
+    // Só fica clicável depois de uma falha (com código completo).
+    confirmButton.disabled = otpCode().length !== 4 || !otpManualConfirmAllowed;
+  }
+  function tryAutoSubmitOtp() {
+    clearOtpAutoSubmit();
+    if (submitting) return;
+    if (otpCode().length !== 4) return;
+    if (!verificationModal.classList.contains('is-open')) return;
+    otpManualConfirmAllowed = false;
+    setOtpConfirmProcessing(true);
+    otpAutoSubmitTimer = setTimeout(function () {
+      otpAutoSubmitTimer = null;
+      if (submitting) return;
+      if (otpCode().length !== 4 || !verificationModal.classList.contains('is-open')) {
+        setOtpConfirmProcessing(false);
+        return;
+      }
+      verifyEmailCode().then(function (ok) {
+        if (!ok) return;
+        resumeSignupAfterVerification();
+      });
+    }, 2000);
   }
   function maskEmailLocal(email) {
     email = String(email || '').trim();
@@ -382,8 +643,11 @@
   function invalidateEmailVerification() {
     emailVerificationToken = '';
     emailVerifiedFor = '';
-    emailCodeSentFor = '';
-    clearOtpInputs();
+    saveSignupSession();
+  }
+  function isCurrentEmailVerified() {
+    var email = String(form.elements.email.value || '').trim().toLowerCase();
+    return !!(email && emailVerificationToken && emailVerifiedFor === email);
   }
   function showVerificationError(message) {
     var err = document.getElementById('email-verification-error');
@@ -500,6 +764,10 @@
   }
   function beginEmailVerificationFlow(force) {
     var email = String(form.elements.email.value || '').trim().toLowerCase();
+    if (!force && isCurrentEmailVerified()) {
+      showStep(2);
+      return Promise.resolve({ ok: true, alreadyVerified: true });
+    }
     var masked = maskEmailLocal(email);
     emailVerificationPending = true;
     setActionBusy(true);
@@ -529,7 +797,7 @@
         return { ok: false };
       }
 
-      if (!force && emailCodeSentFor === email) {
+      if (!force && emailCodeSentFor === email && !isCurrentEmailVerified()) {
         emailVerificationPending = false;
         setActionBusy(false);
         showEmailVerificationForm(masked);
@@ -557,25 +825,44 @@
   }
   function resumeSignupAfterVerification() {
     emailVerificationPending = false;
+    clearOtpAutoSubmit();
+    otpManualConfirmAllowed = false;
+    setOtpConfirmProcessing(false);
+    saveSignupSession();
     setEmailVerificationView('verified');
     setTimeout(function () {
       switchModal(verificationModal, modal, function () {
         showStep(2);
       });
-    }, 700);
+    }, 2000);
   }
   function cancelEmailVerification() {
     emailVerificationPending = false;
-    closeAllModals({ animate: true, onDone: resetForm });
+    clearOtpAutoSubmit();
+    otpManualConfirmAllowed = false;
+    setOtpConfirmProcessing(false);
+    setActionBusy(false);
+    closeAllOverlays({ animate: true, onDone: function () {
+      if (!isSignupOpen()) enterSignupView();
+      showStep(1);
+      saveSignupSession();
+    }});
   }
   function showStep(step) {
     currentStep = step;
     form.querySelectorAll('.signup-step').forEach(function (item) { item.classList.toggle('hidden', Number(item.dataset.step) !== step); });
-    form.querySelectorAll('[data-step-dot]').forEach(function (item) { item.className = 'signup-dot flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold ' + (Number(item.dataset.stepDot) <= step ? 'bg-slate-950 text-white' : 'bg-slate-200 text-slate-500'); });
     document.getElementById('signup-back').classList.toggle('hidden', step === 1);
     document.getElementById('signup-next').classList.toggle('hidden', step === totalSteps);
     document.getElementById('signup-submit').classList.toggle('hidden', step !== totalSteps);
+    document.querySelectorAll('.signup-view-back').forEach(function (btn) {
+      btn.classList.toggle('hidden', step !== 1);
+    });
+    if (step === 3) renderSignupPlanCards();
+    if (step === 1 && String(form.elements.subdomain.value || '').trim()) {
+      checkSubdomain();
+    }
     updateNavigationState();
+    saveSignupSession();
   }
   function updateNavigationState() {
     var next = document.getElementById('signup-next');
@@ -797,6 +1084,7 @@
       loadedPlans = plans;
       document.getElementById('plans-loading').classList.add('hidden');
       renderPlans(plans);
+      renderSignupPlanCards();
       var freeButton = document.getElementById('choose-free-plan');
       if (freeButton) freeButton.disabled = !plans.some(function (plan) { return String(plan.code || '').toUpperCase() === 'FREE'; });
       syncPlanPickerUi('ready');
@@ -810,13 +1098,7 @@
     return plansPromise;
   }
   function openPlanPicker() {
-    openModal(pickerModal);
-    if (loadedPlans.length) {
-      syncPlanPickerUi('ready');
-      return;
-    }
-    syncPlanPickerUi('loading');
-    loadPlans(true);
+    startFreeSignup();
   }
   function loadTypes() {
     request('registration-options').then(function (r) {
@@ -826,23 +1108,18 @@
       (data.business_areas || []).forEach(function (area) { var option = new Option(area.label, area.value); option.dataset.requiresOther = area.requires_other ? '1' : '0'; businessSelect.add(option); });
       setupSearchableSelect(businessSelect, 'Pesquisar área de actividade…');
       syncOther(); syncBusinessArea();
-      updateTestModeLabel(!!data.production_test_mode);
     }).catch(function () { form.elements.company_type.innerHTML = '<option value="">Não foi possível carregar os tipos</option>'; form.elements.business_area.innerHTML = '<option value="">Não foi possível carregar as áreas</option>'; syncBusinessArea(); });
   }
-  function updateTestModeLabel(active) {
-    var label = document.getElementById('signup-subscription-label');
-    if (!label) return;
-    label.textContent = active ? 'Subscrição · Modo de teste activado' : 'Subscrição';
-    label.classList.toggle('text-brand', !active);
-    label.classList.toggle('text-red-600', !!active);
-  }
-  function refreshTestModeLabel() {
-    return request('registrations/test-mode').then(function (r) {
-      updateTestModeLabel(!!(r.body && r.body.active));
-    }).catch(function () {});
-  }
-  function setAvailability(ok, text) { subdomainAvailable = ok; var out = document.getElementById('subdomain-availability'); out.textContent = text; out.className = 'mt-1 block text-xs ' + (ok ? 'text-emerald-600' : 'text-red-600'); updateNavigationState(); }
+  function setAvailability(ok, text) { subdomainAvailable = ok; var out = document.getElementById('subdomain-availability'); out.textContent = text; out.className = 'mt-1 block text-xs ' + (ok ? 'text-emerald-600' : 'text-red-600'); updateNavigationState(); saveSignupSession(); }
   function checkSubdomain() { var value = String(form.elements.subdomain.value || '').trim().toLowerCase(); form.elements.subdomain.value = value; if (!/^[a-z0-9-]+$/.test(value)) { setAvailability(false, value ? 'Use apenas letras minúsculas, números e hífen.' : ''); return Promise.resolve(false); } return request('subdomains/check?subdomain=' + encodeURIComponent(value)).then(function (r) { var data = r.body.data || {}; var ok = r.response.ok && !!data.valid && !!data.available; setAvailability(ok, ok ? 'Endereço disponível.' : 'Este endereço não está disponível.'); return ok; }).catch(function () { setAvailability(false, 'Não foi possível verificar o endereço.'); return false; }); }
+  function ensureSubdomainAvailable() {
+    var value = String(form.elements.subdomain.value || '').trim().toLowerCase();
+    if (!value) {
+      setAvailability(false, '');
+      return Promise.resolve(false);
+    }
+    return checkSubdomain();
+  }
   function syncSubdomainState() {
     var hasName = String(form.elements.name.value || '').replace(/[^\p{L}\p{N}]/gu, '').length >= 2;
     form.elements.subdomain.disabled = !hasName;
@@ -1087,11 +1364,59 @@
     wrap.classList.remove('hidden');
   }
   function setPlanSummary(planName, monthlyLabel) {
-    var summary = document.getElementById('signup-plan-summary');
-    if (!summary) return;
-    summary.innerHTML = '<strong class="font-semibold text-slate-900">Plano escolhido *:</strong> ' + String(planName || '') + ' ' + String(monthlyLabel || '');
+    renderSignupPlanCards();
   }
-  function choosePlan(card) {
+  function renderSignupPlanCards() {
+    var list = document.getElementById('signup-plan-cards');
+    if (!list) return;
+    var selected = String(form.elements.plan_code.value || '').toUpperCase();
+    list.textContent = '';
+    if (!loadedPlans.length) {
+      var loading = document.createElement('p');
+      loading.className = 'col-span-full text-sm text-slate-500';
+      loading.textContent = 'A carregar planos…';
+      list.appendChild(loading);
+      return;
+    }
+    loadedPlans.forEach(function (plan) {
+      var code = String(plan.code || '').toUpperCase();
+      var availableCycles = plan.billing_cycles || ['monthly'];
+      var cardCycle = availableCycles.indexOf(selectedBillingCycle) !== -1 ? selectedBillingCycle : availableCycles[0];
+      if (selected === code && form.elements.billing_cycle && form.elements.billing_cycle.value) {
+        var currentCycle = String(form.elements.billing_cycle.value || '');
+        if (availableCycles.indexOf(currentCycle) !== -1) cardCycle = currentCycle;
+      }
+      var cycleDetails = billingCycles[cardCycle] || { label: cardCycle, period: '/' + cardCycle, months: 1 };
+      var price = plan.price || {};
+      var currency = price.currency || 'MZN';
+      var amount = formatMoney(Number(price.amount || 0) * (code === 'FREE' ? 1 : 1));
+      var monthlyLabel = formatMoney(Number(price.amount || 0)) + ' ' + currency + '/mês';
+      var isSelected = selected === code;
+      var article = document.createElement('article');
+      article.className = 'signup-plan-card signup-plan-card-mini' + (isSelected ? ' is-selected' : '');
+      article.tabIndex = 0;
+      article.setAttribute('role', 'radio');
+      article.setAttribute('aria-checked', isSelected ? 'true' : 'false');
+      article.setAttribute('aria-label', 'Escolher plano ' + (plan.name || code));
+      article.dataset.planCode = code;
+      article.dataset.planName = plan.name || code;
+      article.dataset.planCycles = JSON.stringify(availableCycles);
+      article.dataset.billingCycle = cardCycle;
+      article.dataset.monthlyLabel = monthlyLabel;
+      article.innerHTML =
+        (isSelected ? '<span class="mini-badge">Escolhido</span>' : '') +
+        '<p class="pr-14 text-xs font-semibold uppercase tracking-wide text-slate-500"></p>' +
+        '<p class="text-base font-bold text-slate-950"></p>' +
+        '<p class="text-xs text-slate-500"></p>';
+      var nodes = article.querySelectorAll('p');
+      nodes[0].textContent = plan.name || code;
+      nodes[1].textContent = amount + ' ' + currency;
+      nodes[2].textContent = code === 'FREE' ? 'Grátis para começar' : 'por mês';
+      list.appendChild(article);
+    });
+  }
+  function applySelectedPlan(card, options) {
+    options = options || {};
     if (!card) return;
     var planCode = card.dataset.planCode;
     var planName = card.dataset.planName;
@@ -1100,10 +1425,9 @@
     var plan = findLoadedPlan(planCode);
     var price = (plan && plan.price) || {};
     var currency = price.currency || 'MZN';
-    var monthlyLabel = formatMoney(Number(price.amount || 0)) + ' ' + currency + '/mês';
-    resetForm();
+    var monthlyLabel = card.dataset.monthlyLabel || (formatMoney(Number(price.amount || 0)) + ' ' + currency + '/mês');
+    if (options.reset) resetForm();
     form.elements.plan_code.value = planCode;
-    setPlanSummary(planName, monthlyLabel);
     var cycle = form.elements.billing_cycle;
     cycle.textContent = '';
     JSON.parse(planCycles || '["monthly"]').forEach(function (name) {
@@ -1112,30 +1436,65 @@
     });
     cycle.value = cardCycle || 'monthly';
     syncBillingCycleVisibility();
-    openModal(modal);
+    updatePlanTotalBadge();
+    rememberPlanMeta({
+      plan_code: planCode,
+      plan_name: planName,
+      monthly_label: monthlyLabel,
+      plan_cycles: planCycles || '["monthly"]',
+      billing_cycle: cardCycle || 'monthly'
+    });
+    renderSignupPlanCards();
+    saveSignupSession();
   }
-  document.addEventListener('click', function (event) { var card = event.target.closest('.signup-plan-card'); if (card) choosePlan(card); });
-  document.addEventListener('keydown', function (event) { var card = event.target.closest && event.target.closest('.signup-plan-card'); if (card && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); choosePlan(card); } });
-  document.querySelectorAll('[data-open-plan-picker]').forEach(function (button) { button.addEventListener('click', openPlanPicker); });
-  document.getElementById('choose-free-plan').addEventListener('click', function () { var freeCard = document.querySelector('#plans-list .signup-plan-card[data-plan-code="FREE"]'); if (freeCard) choosePlan(freeCard); else openPlanPicker(); });
+  function choosePlan(card) {
+    if (!card) return;
+    applySelectedPlan(card, { reset: true });
+    enterSignupView();
+  }
+  function selectSignupPlan(card) {
+    if (!card) return;
+    applySelectedPlan(card, { reset: false });
+  }
+  document.addEventListener('click', function (event) {
+    var card = event.target.closest('.signup-plan-card');
+    if (!card) return;
+    if (card.closest('#signup-plan-cards')) {
+      selectSignupPlan(card);
+      return;
+    }
+    choosePlan(card);
+  });
+  document.addEventListener('keydown', function (event) {
+    var card = event.target.closest && event.target.closest('.signup-plan-card');
+    if (!card || (event.key !== 'Enter' && event.key !== ' ')) return;
+    event.preventDefault();
+    if (card.closest('#signup-plan-cards')) {
+      selectSignupPlan(card);
+      return;
+    }
+    choosePlan(card);
+  });
+  document.querySelectorAll('[data-open-plan-picker]').forEach(function (button) { button.addEventListener('click', startFreeSignup); });
+  document.getElementById('choose-free-plan').addEventListener('click', startFreeSignup);
   document.addEventListener('click', function (event) {
     if (!event.target.closest('[data-retry-plans]')) return;
     event.preventDefault();
     loadPlans(true);
   });
   document.querySelectorAll('[data-billing-cycle]').forEach(function (button) { button.addEventListener('click', function () { selectedBillingCycle = button.dataset.billingCycle; document.querySelectorAll('[data-billing-cycle]').forEach(function (item) { var active = item === button; item.setAttribute('aria-pressed', active ? 'true' : 'false'); item.className = active ? 'rounded-lg bg-slate-950 px-4 py-2 text-sm font-semibold text-white shadow-sm' : 'rounded-lg px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-white hover:text-slate-950'; }); if (loadedPlans.length) renderPlans(loadedPlans); }); });
-  document.querySelectorAll('[data-close-plan-picker]').forEach(function (button) {
-    button.addEventListener('click', function () { closeAllModals({ animate: true }); });
-  });
-  document.querySelectorAll('[data-signup-close]').forEach(function (button) {
-    button.addEventListener('click', function () {
-      closeAllModals({ animate: true, onDone: resetForm });
+  document.querySelectorAll('[data-signup-close], [data-signup-home]').forEach(function (el) {
+    el.addEventListener('click', function (event) {
+      event.preventDefault();
+      leaveSignupView({ reset: true });
+      var home = document.getElementById('inicio');
+      if (home) home.scrollIntoView({ behavior: 'smooth' });
     });
   });
   document.querySelectorAll('[data-close-progress]').forEach(function (button) {
     button.addEventListener('click', function () {
       localStorage.removeItem('sizotech_provisioning_id');
-      closeAllModals({ animate: true });
+      leaveSignupView({ reset: true });
     });
   });
   document.addEventListener('keydown', function (event) {
@@ -1144,12 +1503,31 @@
       cancelEmailVerification();
       return;
     }
-    if (!document.querySelector('.signup-modal.is-open')) return;
-    localStorage.removeItem('sizotech_provisioning_id');
-    closeAllModals({ animate: true, onDone: function () {
-      if (modal && !modal.classList.contains('hidden')) return;
-      resetForm();
-    }});
+    if (progressModal.classList.contains('is-open')) {
+      localStorage.removeItem('sizotech_provisioning_id');
+      leaveSignupView({ reset: true });
+      return;
+    }
+    if (!isSignupOpen()) return;
+    leaveSignupView({ reset: true });
+  });
+  window.addEventListener('popstate', function () {
+    if (window.location.hash === '#cadastro') {
+      if (isSignupOpen()) return;
+      var session = readSignupSession();
+      if (session && (session.plan_code || session.fields)) {
+        applySignupSession(session);
+        enterSignupView();
+        return;
+      }
+      if (form.elements.plan_code && form.elements.plan_code.value) {
+        enterSignupView();
+        return;
+      }
+      startFreeSignup();
+      return;
+    }
+    if (isSignupOpen()) leaveSignupView({ reset: true });
   });
   setupPhoneField('phone'); setupPhoneField('phone_alt');
   setupBusinessAreaField();
@@ -1172,7 +1550,10 @@
   [form.elements.address_street, form.elements.address_neighborhood, form.elements.address_house_number].forEach(function (field) { field.addEventListener('input', updateAddressPreview); });
   form.elements.name.addEventListener('input', function () { clearTimeout(suggestTimer); if (!syncSubdomainState()) return; if (!form.elements.subdomain.value.trim()) suggestTimer = setTimeout(suggestSubdomain, 500); });
   form.elements.subdomain.addEventListener('input', function () { clearTimeout(checkTimer); subdomainAvailable = false; var status = document.getElementById('subdomain-availability'); status.textContent = this.value.trim() ? 'A verificar…' : ''; status.className = 'mt-1 block text-xs text-slate-500'; updateNavigationState(); checkTimer = setTimeout(checkSubdomain, 400); });
-  form.querySelectorAll('input, select').forEach(function (field) { field.addEventListener('input', function () { clearError(field.name); updateNavigationState(); }); field.addEventListener('change', function () { clearError(field.name); updateNavigationState(); }); });
+  form.querySelectorAll('input, select').forEach(function (field) {
+    field.addEventListener('input', function () { clearError(field.name); updateNavigationState(); saveSignupSession(); });
+    field.addEventListener('change', function () { clearError(field.name); updateNavigationState(); saveSignupSession(); });
+  });
   function commitSearchableSelect(searchInput) {
     var select = form.elements[searchInput.dataset.selectSearch];
     if (!select || !select._searchOptions) return false;
@@ -1301,9 +1682,10 @@
       showVerificationError('Introduza o código de 4 dígitos enviado por e-mail.');
       return Promise.resolve(false);
     }
+    clearOtpAutoSubmit();
+    otpManualConfirmAllowed = false;
     setActionBusy(true);
-    updateConfirmButton();
-    if (confirmButton) confirmButton.innerHTML = '<span class="button-loader"></span>';
+    setOtpConfirmProcessing(true);
     return request('registrations/email-code/verify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': currentCsrf() },
@@ -1311,23 +1693,25 @@
     }).then(function (r) {
       var body = r.body || {};
       setActionBusy(false);
-      if (confirmButton) confirmButton.innerHTML = 'Confirmar código';
-      updateConfirmButton();
       if (r.response.ok && body.status === 'ok' && body.data && body.data.verification_token) {
         emailVerificationToken = String(body.data.verification_token);
         emailVerifiedFor = email;
+        emailCodeSentFor = email;
+        saveSignupSession();
         clearVerificationError();
         return true;
       }
       var message = (body.errors && body.errors.code && body.errors.code[0] && body.errors.code[0].message)
         || body.message
         || 'O código introduzido é inválido ou expirou.';
+      otpManualConfirmAllowed = true;
+      setOtpConfirmProcessing(false);
       showVerificationError(message);
       return false;
     }).catch(function () {
       setActionBusy(false);
-      if (confirmButton) confirmButton.innerHTML = 'Confirmar código';
-      updateConfirmButton();
+      otpManualConfirmAllowed = true;
+      setOtpConfirmProcessing(false);
       showVerificationError('Não foi possível comunicar com o servidor. Verifique a ligação e tente novamente.');
       return false;
     });
@@ -1340,13 +1724,16 @@
 
     if (currentStep === 1) {
       showSignupMessage('', '');
-      if (!validateStep(1)) return;
-      var email = String(form.elements.email.value || '').trim().toLowerCase();
-      if (emailVerificationToken && emailVerifiedFor === email) {
-        showStep(2);
-        return;
-      }
-      beginEmailVerificationFlow(emailCodeSentFor !== email);
+      setActionBusy(true);
+      ensureSubdomainAvailable().then(function (subOk) {
+        setActionBusy(false);
+        if (!subOk || !validateStep(1)) return;
+        if (isCurrentEmailVerified()) {
+          showStep(2);
+          return;
+        }
+        beginEmailVerificationFlow(false);
+      });
       return;
     }
 
@@ -1389,43 +1776,73 @@
   document.getElementById('signup-back').addEventListener('click', function () { showStep(currentStep - 1); });
   form.elements.email.addEventListener('input', function () {
     var email = String(form.elements.email.value || '').trim().toLowerCase();
-    if (emailVerifiedFor && email !== emailVerifiedFor) invalidateEmailVerification();
+    if (emailVerifiedFor && email !== emailVerifiedFor) {
+      invalidateEmailVerification();
+    }
     if (emailCodeSentFor && email !== emailCodeSentFor) {
       emailCodeSentFor = '';
       clearOtpInputs();
+    }
+  });
+  form.elements.email.addEventListener('change', function () {
+    var email = String(form.elements.email.value || '').trim().toLowerCase();
+    if (emailVerifiedFor && email !== emailVerifiedFor) {
+      invalidateEmailVerification();
     }
   });
   otpInputs.forEach(function (input, index) {
     input.addEventListener('input', function () {
       input.value = String(input.value || '').replace(/\D/g, '').slice(0, 1);
       clearVerificationError();
+      clearOtpAutoSubmit();
+      if (submitting) return;
       if (input.value && index < otpInputs.length - 1) otpInputs[index + 1].focus();
-      updateConfirmButton();
+      if (otpCode().length === 4) {
+        tryAutoSubmitOtp();
+        return;
+      }
+      otpManualConfirmAllowed = false;
+      setOtpConfirmProcessing(false);
     });
     input.addEventListener('keydown', function (event) {
       if (event.key === 'Backspace' && !input.value && index > 0) {
+        if (!submitting) {
+          clearOtpAutoSubmit();
+          otpManualConfirmAllowed = false;
+          setOtpConfirmProcessing(false);
+        }
         otpInputs[index - 1].focus();
       }
       if (isEnterKey(event)) {
         event.preventDefault();
-        if (otpCode().length === 4) verificationForm.requestSubmit();
+        if (submitting || otpConfirmProcessing || otpAutoSubmitTimer) return;
+        if (otpCode().length === 4 && otpManualConfirmAllowed) verificationForm.requestSubmit();
       }
     });
     input.addEventListener('paste', function (event) {
       event.preventDefault();
+      if (submitting) return;
       var pasted = String((event.clipboardData || window.clipboardData).getData('text') || '').replace(/\D/g, '').slice(0, 4);
       if (!pasted) return;
+      clearOtpAutoSubmit();
       pasted.split('').forEach(function (digit, i) {
         if (otpInputs[i]) otpInputs[i].value = digit;
       });
       otpInputs[Math.min(pasted.length, otpInputs.length) - 1].focus();
       clearVerificationError();
-      updateConfirmButton();
+      if (otpCode().length === 4) {
+        otpConfirmProcessing = false;
+        tryAutoSubmitOtp();
+        return;
+      }
+      otpManualConfirmAllowed = false;
+      setOtpConfirmProcessing(false);
     });
   });
   verificationForm.addEventListener('submit', function (event) {
     event.preventDefault();
-    if (submitting) return;
+    if (submitting || otpConfirmProcessing || otpAutoSubmitTimer) return;
+    if (!otpManualConfirmAllowed || otpCode().length !== 4) return;
     verifyEmailCode().then(function (ok) {
       if (!ok) return;
       resumeSignupAfterVerification();
@@ -1533,8 +1950,8 @@
         return;
       }
       restoreSubmitButton();
-      closeAllModals();
-      openModal(modal);
+      closeAllOverlays();
+      enterSignupView();
       newKey();
       if (body.errors) {
         if (body.errors.email_verification_token) {
@@ -1555,8 +1972,8 @@
       );
     }).catch(function () {
       restoreSubmitButton();
-      closeAllModals();
-      openModal(modal);
+      closeAllOverlays();
+      enterSignupView();
       newKey();
       showSignupMessage('Não foi possível comunicar com o servidor. Verifique a ligação e tente novamente.', 'error');
     });
@@ -1574,14 +1991,9 @@
     }
     submitSignup();
   });
-  document.addEventListener('visibilitychange', function () {
-    if (document.visibilityState === 'visible') {
-      refreshTestModeLabel();
-    }
-  });
-  window.addEventListener('focus', refreshTestModeLabel);
-  closeAllModals();
   try { localStorage.removeItem('sizotech_provisioning_id'); } catch (e) {}
-  updateNavigationState(); loadPlans(); loadTypes();
-  refreshTestModeLabel();
+  updateNavigationState();
+  loadPlans();
+  loadTypes();
+  bootstrapSignupView();
 })();

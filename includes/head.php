@@ -14,6 +14,29 @@ $isPublicSite = (bool) preg_match('/^(www\.)?sizotech\.net$/', $host);
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script>
+    (function () {
+      try {
+        var active = location.hash === '#cadastro';
+        if (!active) {
+          var raw = sessionStorage.getItem('sizotech_signup_session');
+          if (raw) {
+            var data = JSON.parse(raw);
+            active = !!(data && data.active);
+          }
+        }
+        if (active) document.documentElement.classList.add('signup-boot');
+      } catch (e) {}
+    })();
+  </script>
+  <style id="signup-boot-css">
+    html.signup-boot,
+    html.signup-boot body { overflow: hidden; background: #fff; }
+    html.signup-boot #site-nav,
+    html.signup-boot main,
+    html.signup-boot footer { display: none !important; visibility: hidden !important; }
+    html.signup-boot #signup-view { display: flex !important; visibility: visible !important; }
+  </style>
 <?php if ($isPublicSite): ?>
   <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
 <?php endif; ?>
