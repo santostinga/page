@@ -32,6 +32,10 @@
   RewriteRule ^api/sizotech/(.*)$ api/sizotech/index.php?route=$1 [QSA,L]
   RewriteRule ^api/analytics/(.*)$ api/analytics/index.php?route=$1 [QSA,L]
 
+  # Página de registo (cadastro)
+  RewriteRule ^register/?$ register.php [L,QSA]
+  RewriteRule ^cadastro/?$ register.php [L,QSA]
+
   # Bloquear acesso directo ao ficheiro de analytics
   RewriteRule ^storage/ - [F,L]
 </IfModule>

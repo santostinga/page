@@ -372,8 +372,14 @@ body.modal-open {
   overflow: hidden;
 }
 
-body.signup-active {
+body.signup-active,
+body.signup-page {
   overflow: hidden;
+}
+
+body.signup-page #signup-view {
+  display: flex !important;
+  visibility: visible !important;
 }
 
 body.signup-active #site-nav,

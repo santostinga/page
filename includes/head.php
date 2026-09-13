@@ -10,31 +10,35 @@ $host = preg_replace('/:\d+$/', '', $host);
 $isPublicSite = (bool) preg_match('/^(www\.)?sizotech\.net$/', $host);
 ?>
 <!DOCTYPE html>
-<html lang="pt">
+<html lang="pt"<?= !empty($isSignupPage) ? ' class="signup-boot"' : '' ?>>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script>
     (function () {
       try {
-        var active = location.hash === '#cadastro';
-        if (!active) {
-          var raw = sessionStorage.getItem('sizotech_signup_session');
-          if (raw) {
-            var data = JSON.parse(raw);
-            active = !!(data && data.active);
-          }
+        var path = String(location.pathname || '');
+        var onRegister = /\/(register|cadastro)\/?$/i.test(path);
+        if (!onRegister && (location.hash === '#cadastro' || location.hash === '#register')) {
+          var q = '';
+          try {
+            var raw = sessionStorage.getItem('sizotech_signup_session');
+            if (raw) {
+              var data = JSON.parse(raw);
+              if (data && data.plan_code) q = '?plan=' + encodeURIComponent(data.plan_code);
+            }
+          } catch (e) {}
+          var base = path.replace(/\/?$/, '/');
+          location.replace(base + 'register' + q);
+          return;
         }
-        if (active) document.documentElement.classList.add('signup-boot');
+        if (onRegister) document.documentElement.classList.add('signup-boot');
       } catch (e) {}
     })();
   </script>
   <style id="signup-boot-css">
     html.signup-boot,
     html.signup-boot body { overflow: hidden; background: #fff; }
-    html.signup-boot #site-nav,
-    html.signup-boot main,
-    html.signup-boot footer { display: none !important; visibility: hidden !important; }
     html.signup-boot #signup-view { display: flex !important; visibility: visible !important; }
   </style>
 <?php if ($isPublicSite): ?>
@@ -74,4 +78,4 @@ $isPublicSite = (bool) preg_match('/^(www\.)?sizotech\.net$/', $host);
   <link href="https://unpkg.com/aos@2.3.4/dist/aos.css" rel="stylesheet">
   <link rel="stylesheet" href="<?= htmlspecialchars(sizo_asset('assets/css/style.css'), ENT_QUOTES, 'UTF-8') ?>">
 </head>
-<body class="font-sans antialiased text-slate-900 bg-white">
+<body class="font-sans antialiased text-slate-900 bg-white<?= !empty($isSignupPage) ? ' signup-page' : '' ?>"<?= !empty($isSignupPage) ? ' data-page="register"' : '' ?>>

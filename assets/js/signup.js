@@ -7,12 +7,8 @@
   var progressModal = document.getElementById('signup-progress-modal');
   var verificationModal = document.getElementById('email-verification-modal');
   var verificationForm = document.getElementById('email-verification-form');
-  if (!form || !modal || !progressModal || !verificationModal || !verificationForm) return;
-  form.elements.company_type.closest('label').classList.add('sm:col-span-2');
-  form.elements.email.closest('label').classList.remove('sm:col-span-2');
-  form.elements.nuit.maxLength = 11;
-  form.elements.nuit.setAttribute('data-mz-nuit', '');
-
+  var isRegisterPage = !!(document.body && document.body.getAttribute('data-page') === 'register')
+    || /\/(register|cadastro)\/?$/i.test(String(window.location.pathname || ''));
   var currentStep = 1;
   var totalSteps = 3;
   var loadedPlans = [];
@@ -33,8 +29,8 @@
   var otpManualConfirmAllowed = false;
   var otpConfirmProcessing = false;
   var pickerModal = null;
-  var otpInputs = Array.prototype.slice.call(verificationModal.querySelectorAll('.otp-input'));
-  var confirmButton = document.getElementById('confirmButton');
+  var otpInputs = [];
+  var confirmButton = null;
   var fieldSteps = { name: 1, company_type: 1, company_type_other: 1, email: 1, nuit: 1, subdomain: 1, phone: 2, phone_alt: 2, address_country: 2, address_province: 2, address_street: 2, address_neighborhood: 2, address_house_number: 2, business_area: 3, business_area_other: 3, plan_code: 3, billing_cycle: 3 };
   var billingCycles = {
     monthly: { label: 'Mensal', period: '/mês', months: 1 },
@@ -42,6 +38,72 @@
     semiannual: { label: 'Semestral', period: '/semestre', months: 6 },
     yearly: { label: 'Anual', period: '/ano', months: 12 }
   };
+
+  function registerPageUrl(params) {
+    params = params || {};
+    var q = [];
+    if (params.plan) q.push('plan=' + encodeURIComponent(String(params.plan).toUpperCase()));
+    if (params.cycle) q.push('cycle=' + encodeURIComponent(String(params.cycle)));
+    var base = String(window.location.pathname || '/').replace(/\/(register|cadastro)\/?$/i, '/');
+    if (!/\/$/.test(base)) base += '/';
+    return base + 'register' + (q.length ? ('?' + q.join('&')) : '');
+  }
+  function siteHomeUrl() {
+    return String(window.location.pathname || '/').replace(/\/(register|cadastro)\/?$/i, '/') || '/';
+  }
+  function goToRegisterPage(params) {
+    window.location.href = registerPageUrl(params);
+  }
+
+  // Landing: planos redireccionam para /register (página real).
+  if (!isRegisterPage) {
+    document.addEventListener('click', function (event) {
+      var card = event.target.closest && event.target.closest('#plans-list .signup-plan-card');
+      if (!card) return;
+      event.preventDefault();
+      goToRegisterPage({
+        plan: card.dataset.planCode || 'FREE',
+        cycle: card.dataset.billingCycle || selectedBillingCycle || 'monthly'
+      });
+    });
+    document.addEventListener('keydown', function (event) {
+      var card = event.target.closest && event.target.closest('#plans-list .signup-plan-card');
+      if (!card || (event.key !== 'Enter' && event.key !== ' ')) return;
+      event.preventDefault();
+      goToRegisterPage({
+        plan: card.dataset.planCode || 'FREE',
+        cycle: card.dataset.billingCycle || selectedBillingCycle || 'monthly'
+      });
+    });
+    document.querySelectorAll('[data-billing-cycle]').forEach(function (button) {
+      button.addEventListener('click', function () {
+        selectedBillingCycle = button.dataset.billingCycle;
+        document.querySelectorAll('[data-billing-cycle]').forEach(function (item) {
+          var active = item === button;
+          item.setAttribute('aria-pressed', active ? 'true' : 'false');
+          item.className = active
+            ? 'rounded-lg bg-slate-950 px-4 py-2 text-sm font-semibold text-white shadow-sm'
+            : 'rounded-lg px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-white hover:text-slate-950';
+        });
+        if (loadedPlans.length) renderPlans(loadedPlans);
+      });
+    });
+    document.addEventListener('click', function (event) {
+      if (!event.target.closest('[data-retry-plans]')) return;
+      event.preventDefault();
+      loadPlans(true);
+    });
+    loadPlans();
+    return;
+  }
+
+  if (!form || !modal || !progressModal || !verificationModal || !verificationForm) return;
+  form.elements.company_type.closest('label').classList.add('sm:col-span-2');
+  form.elements.email.closest('label').classList.remove('sm:col-span-2');
+  form.elements.nuit.maxLength = 11;
+  form.elements.nuit.setAttribute('data-mz-nuit', '');
+  otpInputs = Array.prototype.slice.call(verificationModal.querySelectorAll('.otp-input'));
+  confirmButton = document.getElementById('confirmButton');
 
   function request(path, options) {
     return fetch(api + path, options || {}).then(function (response) {
@@ -186,7 +248,7 @@
     try { sessionStorage.removeItem(SIGNUP_SESSION_KEY); } catch (e) {}
   }
   function saveSignupSession() {
-    if (!isSignupOpen() && window.location.hash !== '#cadastro') return;
+    if (!isRegisterPage && !isSignupOpen()) return;
     try {
       var fields = {};
       Array.prototype.forEach.call(form.elements, function (el) {
@@ -301,52 +363,87 @@
     document.body.classList.add('signup-active');
     document.body.classList.remove('modal-open');
     clearSignupBoot();
-    try {
-      if (window.location.hash !== '#cadastro') {
-        history.pushState({ signup: true }, '', '#cadastro');
-      } else {
-        history.replaceState({ signup: true }, '', '#cadastro');
-      }
-    } catch (e) {}
     saveSignupSession();
     window.scrollTo(0, 0);
   }
   function leaveSignupView(options) {
     options = options || {};
     closeAllOverlays();
-    modal.classList.add('hidden');
-    modal.classList.remove('is-open');
-    modal.setAttribute('aria-hidden', 'true');
-    document.body.classList.remove('signup-active', 'modal-open');
-    clearSignupBoot();
     if (options.reset !== false) {
       resetForm();
       clearSignupSession();
     }
-    try {
-      if (window.location.hash === '#cadastro') {
-        history.replaceState({}, '', window.location.pathname + window.location.search);
-      }
-    } catch (e) {}
-    if (options.onDone) options.onDone();
+    clearSignupBoot();
+    window.location.href = siteHomeUrl();
   }
   function bootstrapSignupView() {
+    enterSignupView();
+    var params = new URLSearchParams(window.location.search || '');
+    var planParam = String(params.get('plan') || '').trim().toUpperCase();
+    var cycleParam = String(params.get('cycle') || '').trim().toLowerCase();
+    if (cycleParam && billingCycles[cycleParam]) selectedBillingCycle = cycleParam;
     var session = readSignupSession();
-    var wantSignup = window.location.hash === '#cadastro' || !!(session && session.active);
-    if (!wantSignup) {
-      clearSignupBoot();
-      modal.classList.add('hidden');
-      modal.classList.remove('is-open');
-      modal.setAttribute('aria-hidden', 'true');
-      document.body.classList.remove('signup-active', 'modal-open');
-      return;
-    }
     if (session && (session.plan_code || session.fields)) {
-      applySignupSession(session);
-      enterSignupView();
-      return;
+      if (!planParam || String(session.plan_code || '').toUpperCase() === planParam) {
+        applySignupSession(session);
+        if (planParam) applyPlanFromQuery(planParam, cycleParam || session.billing_cycle);
+        return;
+      }
     }
-    startFreeSignup();
+    applyPlanFromQuery(planParam || 'FREE', cycleParam || selectedBillingCycle);
+  }
+  function applyPlanFromQuery(planCode, cycle) {
+    planCode = String(planCode || 'FREE').toUpperCase();
+    cycle = String(cycle || selectedBillingCycle || 'monthly').toLowerCase();
+    if (billingCycles[cycle]) selectedBillingCycle = cycle;
+    return loadPlans().then(function (plans) {
+      var plan = (plans || loadedPlans || []).filter(function (item) {
+        return String(item.code || '').toUpperCase() === planCode;
+      })[0];
+      if (!plan) {
+        form.elements.plan_code.value = planCode;
+        setPlanSummary(planCode, planCode === 'FREE' ? '0,00 MZN/mês' : '');
+        var cycleEl = form.elements.billing_cycle;
+        cycleEl.textContent = '';
+        cycleEl.add(new Option('Mensal', 'monthly', true, true));
+        syncBillingCycleVisibility();
+        rememberPlanMeta({
+          plan_code: planCode,
+          plan_name: planCode,
+          monthly_label: planCode === 'FREE' ? '0,00 MZN/mês' : '',
+          plan_cycles: '["monthly"]',
+          billing_cycle: 'monthly'
+        });
+        renderSignupPlanCards();
+        saveSignupSession();
+        return;
+      }
+      var availableCycles = plan.billing_cycles || ['monthly'];
+      var cardCycle = availableCycles.indexOf(selectedBillingCycle) !== -1 ? selectedBillingCycle : availableCycles[0];
+      var price = plan.price || {};
+      var currency = price.currency || 'MZN';
+      var monthlyLabel = formatMoney(Number(price.amount || 0)) + ' ' + currency + '/mês';
+      form.elements.plan_code.value = planCode;
+      setPlanSummary(plan.name || planCode, monthlyLabel);
+      var cycleSelect = form.elements.billing_cycle;
+      cycleSelect.textContent = '';
+      availableCycles.forEach(function (name) {
+        var details = billingCycles[name];
+        cycleSelect.add(new Option(details ? details.label : name, name, false, name === cardCycle));
+      });
+      cycleSelect.value = cardCycle;
+      syncBillingCycleVisibility();
+      updatePlanTotalBadge();
+      rememberPlanMeta({
+        plan_code: planCode,
+        plan_name: plan.name || planCode,
+        monthly_label: monthlyLabel,
+        plan_cycles: JSON.stringify(availableCycles),
+        billing_cycle: cardCycle
+      });
+      renderSignupPlanCards();
+      saveSignupSession();
+    });
   }
   function closeAllOverlays(options) {
     var animate = !!(options && options.animate);
@@ -465,33 +562,12 @@
     if (pageError) pageError.classList.add('hidden');
   }
   function startFreeSignup() {
-    var freeCard = document.querySelector('#plans-list .signup-plan-card[data-plan-code="FREE"]');
-    if (freeCard) {
-      choosePlan(freeCard);
-      return;
-    }
-    loadPlans(true).then(function () {
-      var card = document.querySelector('#plans-list .signup-plan-card[data-plan-code="FREE"]');
-      if (card) {
-        choosePlan(card);
-        return;
-      }
-      resetForm();
-      form.elements.plan_code.value = 'FREE';
-      setPlanSummary('FREE', '0,00 MZN/mês');
-      var cycle = form.elements.billing_cycle;
-      cycle.textContent = '';
-      cycle.add(new Option('Mensal', 'monthly', true, true));
-      syncBillingCycleVisibility();
-      rememberPlanMeta({
-        plan_code: 'FREE',
-        plan_name: 'FREE',
-        monthly_label: '0,00 MZN/mês',
-        plan_cycles: '["monthly"]',
-        billing_cycle: 'monthly'
-      });
-      enterSignupView();
-    });
+    applyPlanFromQuery('FREE', 'monthly');
+  }
+  function choosePlan(card) {
+    if (!card) return;
+    applySelectedPlan(card, { reset: true });
+    enterSignupView();
   }
   function getKey() {
     var key = sessionStorage.getItem('sizotech_registration_key');
@@ -1063,7 +1139,9 @@
     return Object.keys(errors).length === 0;
   }
   function renderPlans(plans, list) {
-    list = list || document.getElementById('plans-list'); list.textContent = '';
+    list = list || document.getElementById('plans-list');
+    if (!list) return;
+    list.textContent = '';
     plans.forEach(function (plan) {
       var code = String(plan.code || '').toUpperCase(); var featured = code === 'STANDARD';
       var availableCycles = plan.billing_cycles || ['monthly'];
@@ -1084,11 +1162,14 @@
       var plans = extractPlans(r.body);
       if (!r.response.ok || !plans.length) throw new Error(r.body.message || 'plans_unavailable');
       loadedPlans = plans;
-      document.getElementById('plans-loading').classList.add('hidden');
+      var pageLoading = document.getElementById('plans-loading');
+      if (pageLoading) pageLoading.classList.add('hidden');
       renderPlans(plans);
-      renderSignupPlanCards();
+      if (isRegisterPage) renderSignupPlanCards();
       var freeButton = document.getElementById('choose-free-plan');
-      if (freeButton) freeButton.disabled = !plans.some(function (plan) { return String(plan.code || '').toUpperCase() === 'FREE'; });
+      if (freeButton && freeButton.tagName === 'BUTTON') {
+        freeButton.disabled = !plans.some(function (plan) { return String(plan.code || '').toUpperCase() === 'FREE'; });
+      }
       syncPlanPickerUi('ready');
       return plans;
     }).catch(function () {
@@ -1470,11 +1551,6 @@
     renderSignupPlanCards();
     saveSignupSession();
   }
-  function choosePlan(card) {
-    if (!card) return;
-    applySelectedPlan(card, { reset: true });
-    enterSignupView();
-  }
   function selectSignupPlan(card) {
     if (!card) return;
     applySelectedPlan(card, { reset: false });
@@ -1486,7 +1562,7 @@
       selectSignupPlan(card);
       return;
     }
-    choosePlan(card);
+    // Cartões da landing não existem nesta página.
   });
   document.addEventListener('keydown', function (event) {
     var card = event.target.closest && event.target.closest('.signup-plan-card');
@@ -1494,12 +1570,8 @@
     event.preventDefault();
     if (card.closest('#signup-plan-cards')) {
       selectSignupPlan(card);
-      return;
     }
-    choosePlan(card);
   });
-  document.querySelectorAll('[data-open-plan-picker]').forEach(function (button) { button.addEventListener('click', startFreeSignup); });
-  document.getElementById('choose-free-plan').addEventListener('click', startFreeSignup);
   document.addEventListener('click', function (event) {
     if (!event.target.closest('[data-retry-plans]')) return;
     event.preventDefault();
@@ -1510,8 +1582,6 @@
     el.addEventListener('click', function (event) {
       event.preventDefault();
       leaveSignupView({ reset: true });
-      var home = document.getElementById('inicio');
-      if (home) home.scrollIntoView({ behavior: 'smooth' });
     });
   });
   document.querySelectorAll('[data-close-progress]').forEach(function (button) {
@@ -1533,24 +1603,6 @@
     }
     if (!isSignupOpen()) return;
     leaveSignupView({ reset: true });
-  });
-  window.addEventListener('popstate', function () {
-    if (window.location.hash === '#cadastro') {
-      if (isSignupOpen()) return;
-      var session = readSignupSession();
-      if (session && (session.plan_code || session.fields)) {
-        applySignupSession(session);
-        enterSignupView();
-        return;
-      }
-      if (form.elements.plan_code && form.elements.plan_code.value) {
-        enterSignupView();
-        return;
-      }
-      startFreeSignup();
-      return;
-    }
-    if (isSignupOpen()) leaveSignupView({ reset: true });
   });
   setupPhoneField('phone'); setupPhoneField('phone_alt');
   setupBusinessAreaField();
@@ -1709,7 +1761,9 @@
         var errMsg = first && body.errors[first] && body.errors[first][0] && body.errors[first][0].message;
         return { ok: false, message: errMsg || 'Não foi possível enviar o código. Tente novamente.' };
       }
-      return { ok: false, message: body.message || 'Não foi possível enviar o código. Tente novamente.' };
+      var failMsg = body.message || 'Não foi possível enviar o código. Tente novamente.';
+      if (body.debug) failMsg += ' (' + String(body.debug) + ')';
+      return { ok: false, message: failMsg };
     }).catch(function () {
       setActionBusy(false);
       return { ok: false, message: 'Não foi possível comunicar com o servidor. Verifique a ligação e tente novamente.' };
