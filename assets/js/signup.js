@@ -52,6 +52,7 @@
     return String(window.location.pathname || '/').replace(/\/(register|cadastro)\/?$/i, '/') || '/';
   }
   function goToRegisterPage(params) {
+    if (typeof window.sizoShowPageLoader === 'function') window.sizoShowPageLoader();
     window.location.href = registerPageUrl(params);
   }
 
@@ -374,6 +375,7 @@
       clearSignupSession();
     }
     clearSignupBoot();
+    if (typeof window.sizoShowPageLoader === 'function') window.sizoShowPageLoader();
     window.location.href = siteHomeUrl();
   }
   function bootstrapSignupView() {

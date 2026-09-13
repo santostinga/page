@@ -1,6 +1,75 @@
 (function () {
   'use strict';
 
+  function ensurePageLoader() {
+    var el = document.getElementById('page-loader');
+    if (el) return el;
+    el = document.createElement('div');
+    el.id = 'page-loader';
+    el.className = 'page-loader';
+    el.setAttribute('aria-hidden', 'true');
+    el.setAttribute('role', 'status');
+    el.innerHTML = '<div class="loader" aria-label="A carregar"></div>';
+    (document.body || document.documentElement).appendChild(el);
+    return el;
+  }
+
+  function showPageLoader() {
+    var el = ensurePageLoader();
+    el.classList.add('is-visible');
+    el.setAttribute('aria-hidden', 'false');
+  }
+
+  function hidePageLoader() {
+    var el = document.getElementById('page-loader');
+    if (!el) return;
+    el.classList.remove('is-visible');
+    el.setAttribute('aria-hidden', 'true');
+  }
+
+  function isSameDocumentNav(url) {
+    return url.pathname === location.pathname && url.search === location.search;
+  }
+
+  function shouldShowLoaderForAnchor(anchor, event) {
+    if (!anchor || event.defaultPrevented) return false;
+    if (event.button !== 0) return false;
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return false;
+    var target = (anchor.getAttribute('target') || '').toLowerCase();
+    if (target && target !== '_self') return false;
+    if (anchor.hasAttribute('download')) return false;
+    var href = anchor.getAttribute('href');
+    if (!href || href.charAt(0) === '#') return false;
+    var lower = href.toLowerCase();
+    if (lower.indexOf('mailto:') === 0 || lower.indexOf('tel:') === 0 || lower.indexOf('javascript:') === 0) return false;
+    var url;
+    try {
+      url = new URL(href, location.href);
+    } catch (e) {
+      return false;
+    }
+    if (url.origin !== location.origin) return false;
+    if (isSameDocumentNav(url)) return false;
+    return true;
+  }
+
+  window.sizoShowPageLoader = showPageLoader;
+  window.sizoHidePageLoader = hidePageLoader;
+
+  document.addEventListener('DOMContentLoaded', function () {
+    ensurePageLoader();
+    hidePageLoader();
+  });
+  window.addEventListener('pageshow', function () {
+    hidePageLoader();
+  });
+
+  document.addEventListener('click', function (event) {
+    var anchor = event.target.closest && event.target.closest('a[href]');
+    if (!shouldShowLoaderForAnchor(anchor, event)) return;
+    showPageLoader();
+  }, true);
+
   if (typeof AOS !== 'undefined') {
     AOS.init({
       duration: 700,

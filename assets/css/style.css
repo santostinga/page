@@ -604,6 +604,49 @@ html.signup-boot #signup-view {
   to { transform: rotate(360deg); }
 }
 
+/* Loader só em navegação entre páginas (não dentro da mesma) */
+.page-loader {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  pointer-events: none;
+}
+
+.page-loader.is-visible {
+  display: flex;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.page-loader .loader {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #ddd;
+  border-top-color: #111;
+  border-radius: 50%;
+  animation: page-loader-spin 0.7s linear infinite;
+}
+
+@keyframes page-loader-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-loader .loader {
+    animation: none;
+    border-top-color: #111;
+    opacity: 0.7;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .signup-modal,
   .signup-modal > div,
