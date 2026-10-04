@@ -73,6 +73,11 @@ if (!str_contains($html, 'name="robots"')) {
     );
 }
 
+require_once __DIR__ . '/convite/splash.php';
+require_once __DIR__ . '/convite/ui.php';
+$html = convite_apply_splash($html);
+$html = convite_apply_ui($html);
+
 header('Content-Type: text/html; charset=utf-8');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
