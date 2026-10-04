@@ -3,15 +3,15 @@ declare(strict_types=1);
 
 require_once dirname(__DIR__) . '/config/assets.php';
 
-/** Ordem das fases do convite (URLs com cache-bust). */
+/** Imagens 1→5 na mesma ordem dos ficheiros originais. Nome do convidado no slide 2 (imagem 2). */
 function convite_image_urls(): array
 {
     return [
-        sizo_asset('convite/assets/fase-1-marciano-marta.jpg'),
-        sizo_asset('convite/assets/fase-2-escritura.jpg'),
-        sizo_asset('convite/assets/fase-3-convidado.jpg'),
-        sizo_asset('convite/assets/fase-4-programa.jpg'),
-        sizo_asset('convite/assets/fase-5-presenca.jpg'),
+        sizo_asset('convite/assets/fase-1.jpg'),
+        sizo_asset('convite/assets/fase-2.jpg'),
+        sizo_asset('convite/assets/fase-3.jpg'),
+        sizo_asset('convite/assets/fase-4.jpg'),
+        sizo_asset('convite/assets/fase-5.jpg'),
     ];
 }
 

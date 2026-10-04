@@ -30,7 +30,8 @@ if ($slug === '' || !isset($guests[$slug]) || in_array($slug, $reserved, true)) 
     exit;
 }
 
-$guestName = $guests[$slug];
+require_once __DIR__ . '/convite/format.php';
+$guestName = convite_format_guest_display($guests[$slug]);
 $templatePath = __DIR__ . '/convite/template.html';
 
 if (!is_readable($templatePath)) {
@@ -78,7 +79,7 @@ if (!str_contains($html, 'name="robots"')) {
 
 require_once __DIR__ . '/convite/splash.php';
 require_once __DIR__ . '/convite/ui.php';
-$html = convite_apply_splash($html);
+$html = convite_apply_splash($html, $guestName);
 $html = convite_apply_ui($html);
 
 header('Content-Type: text/html; charset=utf-8');

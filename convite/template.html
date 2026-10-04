@@ -15,8 +15,22 @@ body{overflow:hidden}
 .page.active{opacity:1;pointer-events:auto}
 .art{position:relative;width:min(100vw,56.28dvh);aspect-ratio:941/1672;max-height:100dvh}
 .art img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block;user-select:none;-webkit-user-drag:none;background:#f8f4ef}
-.guest{position:absolute;left:50%;top:36.5%;width:78%;transform:translate(-50%,-50%);text-align:center;color:#8b1738;font-family:Georgia,"Times New Roman",serif;font-size:clamp(14px,3.4vw,26px);line-height:1.1;font-weight:700;letter-spacing:.065em;text-transform:uppercase;white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .45s ease}
+.guest{
+  position:absolute;left:50%;transform:translate(-50%,-50%);text-align:center;
+  color:#8b1738;font-family:Georgia,"Times New Roman",serif;font-weight:700;
+  text-transform:none;pointer-events:none;opacity:0;transition:opacity .45s ease;
+}
 .page.active .guest{opacity:1}
+/* Slide 2 (imagem 2): faixa entre «Convidam» e o coração */
+.page--guest-name .guest{
+  top:43.2%;width:min(68%,15.5rem);max-width:88%;
+  font-size:clamp(10px,2.55vw,19px);line-height:1.14;letter-spacing:.055em;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.page--guest-name .guest.is-wrap{
+  white-space:normal;text-wrap:balance;line-height:1.08;
+  font-size:clamp(9px,2.35vw,17px);
+}
 .ui-top{position:absolute;top:max(10px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:20;display:flex;gap:6px}
 .dot{width:7px;height:7px;border:0;border-radius:20px;background:rgba(112,45,52,.22);padding:0;transition:.3s;cursor:pointer}
 .dot.active{width:22px;background:#8b1738}
@@ -35,11 +49,11 @@ body{overflow:hidden}
 <body>
 <main id="app" aria-label="Convite de casamento Marciano e Marta">
   <div id="book">
-    <section class="page active"><div class="art"><img alt="Marciano e Marta" decoding="async"></div></section>
-    <section class="page"><div class="art"><img alt="Escritura" decoding="async"></div></section>
-    <section class="page"><div class="art"><img alt="Convite personalizado" decoding="async"><div class="guest">Convidado</div></div></section>
-    <section class="page"><div class="art"><img alt="Programa da celebração" decoding="async"></div></section>
-    <section class="page"><div class="art"><img alt="Presença" decoding="async"></div></section>
+    <section class="page active"><div class="art"><img alt="Fase 1" decoding="async"></div></section>
+    <section class="page page--guest-name"><div class="art"><img alt="Fase 2 — Marciano e Marta" decoding="async"><div class="guest">Convidado</div></div></section>
+    <section class="page"><div class="art"><img alt="Fase 3" decoding="async"></div></section>
+    <section class="page"><div class="art"><img alt="Fase 4" decoding="async"></div></section>
+    <section class="page"><div class="art"><img alt="Fase 5" decoding="async"></div></section>
   </div>
   <div class="ui-top" id="dots" aria-label="Páginas"></div>
   <div class="swipe"><i data-lucide="chevron-right" style="width:18px;height:18px"></i></div>
@@ -68,11 +82,38 @@ IMAGES.forEach((_,i)=>{
   dots.appendChild(b);
 });
 
+function fitGuestName(){
+  const guest=document.querySelector('.page--guest-name .guest');
+  const art=guest&&guest.closest('.art');
+  if(!guest||!art)return;
+  guest.classList.remove('is-wrap');
+  guest.style.fontSize='';
+  const maxW=art.clientWidth*0.68;
+  let fs=parseFloat(getComputedStyle(guest).fontSize)||16;
+  let guard=0;
+  while(guest.scrollWidth>maxW&&fs>8.5&&guard<40){
+    fs-=0.45;
+    guest.style.fontSize=fs+'px';
+    guard++;
+  }
+  if(guest.scrollWidth>maxW||guest.textContent.length>26){
+    guest.classList.add('is-wrap');
+    guest.style.fontSize='';
+    fs=parseFloat(getComputedStyle(guest).fontSize)||14;
+    guard=0;
+    while(guest.scrollHeight>art.clientHeight*0.08&&fs>8&&guard<30){
+      fs-=0.4;
+      guest.style.fontSize=fs+'px';
+      guard++;
+    }
+  }
+}
 function render(){
   pages.forEach((p,i)=>p.classList.toggle('active',i===index));
   [...dots.children].forEach((d,i)=>d.classList.toggle('active',i===index));
   nextLabel.textContent=index===pages.length-1?'Recomeçar':'Continuar';
   prev.style.opacity=index===0?'.35':'1';
+  if(index===1)requestAnimationFrame(fitGuestName);
 }
 function go(n){index=(n+pages.length)%pages.length;render();}
 function forward(){go(index===pages.length-1?0:index+1);}
@@ -95,6 +136,8 @@ document.addEventListener('keydown',e=>{
 });
 if(typeof lucide!=='undefined')lucide.createIcons();
 render();
+window.addEventListener('resize',fitGuestName);
+if(document.fonts&&document.fonts.ready){document.fonts.ready.then(fitGuestName);}else{setTimeout(fitGuestName,120);}
 </script>
 </body>
 </html>

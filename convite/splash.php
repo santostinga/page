@@ -18,7 +18,7 @@ body.convite-loading{overflow:hidden}
 .convite-splash-names{
   min-height:1.6em;margin:0 0 1.25rem;
   font-size:clamp(.78rem,3vw,.92rem);font-weight:400;font-style:italic;
-  letter-spacing:.14em;text-transform:none;color:rgba(117,19,49,.38);
+  letter-spacing:.04em;text-transform:none;color:rgba(117,19,49,.42);
 }
 .convite-splash-bar{
   height:3px;width:min(220px,70vw);margin:0 auto .65rem;border-radius:999px;
@@ -43,7 +43,7 @@ function convite_splash_body_markup(): string
     return <<<'HTML'
 <div id="convite-splash" role="status" aria-live="polite" aria-busy="true">
   <div class="convite-splash-inner">
-    <p class="convite-splash-title">Abrindo o seu convite</p>
+    <p class="convite-splash-title">Abrindo seu convite</p>
     <p class="convite-splash-names" id="convite-splash-names" aria-hidden="true"></p>
     <div class="convite-splash-bar" aria-hidden="true"><div class="convite-splash-bar-fill" id="convite-splash-bar"></div></div>
     <p class="convite-splash-pct" id="convite-splash-pct">0%</p>
@@ -63,7 +63,7 @@ function convite_splash_body_script(): string
   var barEl=document.getElementById('convite-splash-bar');
   var pctEl=document.getElementById('convite-splash-pct');
   var shownAt=Date.now(),minMs=2200,maxMs=120000;
-  var fullName='Marciano & Marta';
+  var fullName=__CONVITE_SPLASH_NAME_JSON__;
   var typed=0,typeTimer=null;
   var loadPct=0,typeDone=false,loadDone=false;
 
@@ -82,7 +82,8 @@ function convite_splash_body_script(): string
     }
     typed++;
     namesEl.textContent=fullName.slice(0,typed);
-    var delay=fullName.charAt(typed-1)===' ' ? 120 : (fullName.charAt(typed-1)==='&' ? 200 : 85);
+    var ch=fullName.charAt(typed-1);
+    var delay=ch===' ' ? 100 : (ch==='&' ? 180 : 78);
     typeTimer=setTimeout(typeStep,delay);
   }
 
@@ -114,7 +115,8 @@ function convite_splash_body_script(): string
     });
   }
 
-  typeStep();
+  if(!fullName){typeDone=true;}
+  else typeStep();
   preloadImages(window.CONVITE_IMAGES);
   setTimeout(function(){
     loadDone=true;
@@ -128,11 +130,18 @@ function convite_splash_body_script(): string
 HTML;
 }
 
-function convite_apply_splash(string $html): string
+function convite_apply_splash(string $html, string $guestDisplayName): string
 {
     if (str_contains($html, 'id="convite-splash"')) {
         return $html;
     }
+
+    $nameJson = json_encode($guestDisplayName, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
+    if ($nameJson === false) {
+        $nameJson = '""';
+    }
+
+    $script = str_replace('__CONVITE_SPLASH_NAME_JSON__', $nameJson, convite_splash_body_script());
 
     $html = preg_replace('/<\/head>/i', convite_splash_head_style() . "\n</head>", $html, 1) ?? $html;
 
@@ -145,7 +154,7 @@ function convite_apply_splash(string $html): string
 
     $html = preg_replace(
         '/<\/body>/i',
-        convite_splash_body_script() . "\n</body>",
+        $script . "\n</body>",
         $html,
         1
     ) ?? $html;
