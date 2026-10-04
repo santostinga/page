@@ -36,6 +36,17 @@
   RewriteRule ^register/?$ register.php [L,QSA]
   RewriteRule ^cadastro/?$ register.php [L,QSA]
 
+  # Convite de casamento — link personalizado (ex.: /santos-esposa)
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteCond %{REQUEST_URI} !^/api/ [NC]
+  RewriteCond %{REQUEST_URI} !^/assets/ [NC]
+  RewriteCond %{REQUEST_URI} !^/storage/ [NC]
+  RewriteCond %{REQUEST_URI} !^/admin/ [NC]
+  RewriteCond %{REQUEST_URI} !^/favicon\.ico$ [NC]
+  RewriteCond %{REQUEST_URI} !^/robots\.txt$ [NC]
+  RewriteRule ^([a-z0-9][a-z0-9-]*)/?$ convite.php?slug=$1 [L,QSA]
+
   # Bloquear acesso directo ao ficheiro de analytics
   RewriteRule ^storage/ - [F,L]
 </IfModule>
