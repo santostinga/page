@@ -23,13 +23,13 @@ body{overflow:hidden}
 .page.active .guest{opacity:1}
 /* Slide 2 (imagem 2): faixa entre «Convidam» e o coração */
 .page--guest-name .guest{
-  top:43.2%;width:min(68%,15.5rem);max-width:88%;
-  font-size:clamp(10px,2.55vw,19px);line-height:1.14;letter-spacing:.055em;
+  top:43.2%;width:min(78%,17.5rem);max-width:92%;
+  font-size:clamp(15px,4.6vw,24px);line-height:1.12;letter-spacing:.04em;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 }
 .page--guest-name .guest.is-wrap{
-  white-space:normal;text-wrap:balance;line-height:1.08;
-  font-size:clamp(9px,2.35vw,17px);
+  white-space:normal;text-wrap:balance;line-height:1.1;
+  font-size:clamp(13px,4vw,21px);
 }
 .ui-top{position:absolute;top:max(10px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:20;display:flex;gap:6px}
 .dot{width:7px;height:7px;border:0;border-radius:20px;background:rgba(112,45,52,.22);padding:0;transition:.3s;cursor:pointer}
@@ -41,6 +41,8 @@ body{overflow:hidden}
 @media(max-width:640px){
  #app{height:100dvh}
  .art{width:min(100vw,calc(100dvh * .5628));height:auto}
+ .page--guest-name .guest{font-size:clamp(16px,5.2vw,24px)}
+ .page--guest-name .guest.is-wrap{font-size:clamp(14px,4.6vw,21px)}
 }
 @media(prefers-reduced-motion:reduce){.page{transition:none}}
 </style>
@@ -88,21 +90,23 @@ function fitGuestName(){
   if(!guest||!art)return;
   guest.classList.remove('is-wrap');
   guest.style.fontSize='';
-  const maxW=art.clientWidth*0.68;
-  let fs=parseFloat(getComputedStyle(guest).fontSize)||16;
+  const maxW=art.clientWidth*0.82;
+  let fs=parseFloat(getComputedStyle(guest).fontSize)||18;
+  const minFs=window.matchMedia('(max-width:640px)').matches?12:11;
   let guard=0;
-  while(guest.scrollWidth>maxW&&fs>8.5&&guard<40){
-    fs-=0.45;
+  while(guest.scrollWidth>maxW&&fs>minFs&&guard<28){
+    fs-=0.35;
     guest.style.fontSize=fs+'px';
     guard++;
   }
-  if(guest.scrollWidth>maxW||guest.textContent.length>26){
+  if(guest.scrollWidth>maxW||guest.textContent.length>34){
     guest.classList.add('is-wrap');
     guest.style.fontSize='';
-    fs=parseFloat(getComputedStyle(guest).fontSize)||14;
+    fs=parseFloat(getComputedStyle(guest).fontSize)||16;
     guard=0;
-    while(guest.scrollHeight>art.clientHeight*0.08&&fs>8&&guard<30){
-      fs-=0.4;
+    const minWrap=window.matchMedia('(max-width:640px)').matches?11.5:10.5;
+    while(guest.scrollHeight>art.clientHeight*0.095&&fs>minWrap&&guard<24){
+      fs-=0.35;
       guest.style.fontSize=fs+'px';
       guard++;
     }
