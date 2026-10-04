@@ -11,6 +11,7 @@ return [
     'jacinto-bia' => 'Jacinto e Bia',
     'cecilia-helena' => 'Cecilia e Helena',
     'manuel-paula' => 'Manuel e Paula',
+    'mapedjissane-esposa' => 'Mapedjissane e Esposa',
     'gloria-lau' => 'Gloria e Lau',
     'argentina-elisa' => 'Argentina e Elisa',
     'fatima-ondina' => 'Fatima e Ondina',
