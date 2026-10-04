@@ -48,6 +48,9 @@ if ($html === false) {
     exit;
 }
 
+require_once __DIR__ . '/convite/images.php';
+$html = convite_inject_images($html);
+
 $guestHtml = htmlspecialchars($guestName, ENT_QUOTES | ENT_HTML5, 'UTF-8');
 
 $html = preg_replace(
