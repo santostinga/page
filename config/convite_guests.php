@@ -7,6 +7,7 @@ return [
     'celeste-elsinha' => 'Celeste e Elsinha',
     'arsenio-airosa' => 'Arsénio e Airosa',
     'dorcas-anselmo' => 'Dorca e Anselmo',
+    'elisa-simbine' => 'Elisa e Simbine',
     'anencia-fernando' => 'Anência e Fernando',
     'jacinto-bia' => 'Jacinto e Bia',
     'cecilia-helena' => 'Cecilia e Helena',
