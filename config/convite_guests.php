@@ -21,6 +21,7 @@ return [
     'auria-esposo' => 'Auria e esposo',
     'lourenco-yolanda' => 'Lourenço e Yolanda',
     'odete-melita' => 'Odete e Melita',
+    'melita-luisa' => 'Melita e Luísa',
     'baptista-faura' => 'Baptista e Fáura',
     'helio-dina' => 'Hélio e Dina',
     'antonio-rosa' => 'António e Rosa',
